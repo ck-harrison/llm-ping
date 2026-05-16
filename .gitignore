@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local
+CLAUDE.local.md
+
+# Packages
+*.zip
+node_modules/
+
+# Build artifacts
+*.crx
+*.pem
