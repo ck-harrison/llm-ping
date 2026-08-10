@@ -39,11 +39,15 @@ PingIt is a Chrome extension that sends AI responses between ChatGPT, Claude, Ge
 
 1. Open the PingIt popup
 2. Select two AIs (e.g., Grok ↔ Gemini)
-3. Pick a mode — pass through, critique, improve, compare, or expand
+3. Pick a mode — as-is, critique, improve, compare, or expand
 4. Set rounds (default: 5)
 5. Click Start
 6. Type a question in AI A and submit
 7. Watch them go back and forth automatically
+
+Start checks that both AIs are open and on fresh chats first. If one isn't, it
+offers to open fresh tabs for you — or to run on the existing chats anyway, if
+that's what you want.
 
 A small bar appears on both tabs with the round counter, a Stop button, and Copy
 transcript. Critique mode is the one worth trying first: each AI picks apart the
@@ -76,7 +80,7 @@ That puts the captured response on your system clipboard.
 
 ## Version
 
-3.4.2
+3.5.0
 
 ## License
 

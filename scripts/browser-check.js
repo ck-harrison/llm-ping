@@ -276,6 +276,24 @@ async function waitForCdp() {
     after.reply && after.reply.active === false && /No open tab/.test(after.reply.lastError || ""),
     JSON.stringify(after.reply));
 
+  // The preflight flow, driven through the real popup: no LLM tabs are open in this
+  // profile, so pressing Start must refuse and offer both ways out rather than
+  // starting a session that cannot run.
+  await evaluate(`document.getElementById('btnStart').click()`);
+  await sleep(2000);
+  const preflightStatus = await evaluate(`document.getElementById('chainStatus').textContent`);
+  const choices = await evaluate(`[
+    getComputedStyle(document.getElementById('btnOpenFresh')).display,
+    getComputedStyle(document.getElementById('btnStartAnyway')).display,
+    getComputedStyle(document.getElementById('btnStart')).display
+  ].join(',')`);
+  record("Preflight refuses to start with no tabs open",
+    typeof preflightStatus === "string" && /not open/.test(preflightStatus),
+    `status reads "${preflightStatus}"`);
+  record("Preflight offers opening fresh tabs, and hides the override that could not work",
+    choices === "block,none,none",
+    `openFresh/startAnyway/start display = ${choices}`);
+
   if (SHOT) {
     await call(browser, "Emulation.setDeviceMetricsOverride", { width: 320, height: 640, deviceScaleFactor: 2, mobile: false }, popupSession);
     const shot = await call(browser, "Page.captureScreenshot", { format: "png" }, popupSession);

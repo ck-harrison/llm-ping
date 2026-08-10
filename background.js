@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.4.2 ──
+// ── LLM PingIt – Background Service Worker v3.5.0 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -361,6 +361,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.action === "preflightChain") {
+    ready.then(() => preflightChain(msg).then(sendResponse))
+      .catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  if (msg.action === "openFreshTabs") {
+    ready.then(() => openFreshTabs(msg).then(sendResponse))
+      .catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
   if (msg.action === "getTranscript") {
     ready.then(() => sendResponse({
       text: chainState.transcript.length ? buildTranscript() : "",
@@ -443,7 +455,77 @@ function pushHud() {
 //  PING PONG
 // ══════════════════════════════════════════════════
 
-async function startChain({ llmA, llmB, mode, maxRounds, windowId }) {
+function findTabFor(targetId, allTabs, windowId) {
+  const match = TARGETS[targetId].match;
+  const matching = allTabs.filter((t) => t.url && t.url.includes(match));
+  if (matching.length === 0) return null;
+  if (windowId) {
+    const sameWindow = matching.find((t) => t.windowId === windowId);
+    if (sameWindow) return sameWindow;
+  }
+  return matching.find((t) => t.active) || matching[matching.length - 1];
+}
+
+// Report the state of both tabs so the popup can offer to fix it before starting.
+// Read-only: it opens nothing and changes nothing.
+async function preflightChain({ llmA, llmB, windowId }) {
+  if (!TARGETS[llmA] || !TARGETS[llmB]) return { ok: false, error: "Unknown LLM selected." };
+  if (llmA === llmB) return { ok: false, error: "Pick two different LLMs." };
+
+  const allTabs = await chrome.tabs.query({});
+  const results = [];
+  for (const id of [llmA, llmB]) {
+    const tab = findTabFor(id, allTabs, windowId);
+    const entry = {
+      targetId: id,
+      label: TARGETS[id].label,
+      hasTab: !!tab,
+      tabId: tab ? tab.id : null,
+      url: tab ? tab.url : null,
+      fresh: tab ? isFreshChatUrl(id, tab.url) : false,
+      messages: null,
+    };
+    if (tab) {
+      // Context only — never the verdict. A tab that cannot answer still gets a
+      // verdict from its URL.
+      try {
+        const status = await chrome.tabs.sendMessage(tab.id, { action: "getStatus" });
+        entry.messages = status ? status.msgCount : null;
+      } catch (e) {
+        console.log(`[LLM PingIt] Preflight could not read the ${entry.label} tab: ${e.message}`);
+      }
+    }
+    results.push(entry);
+  }
+  console.log("[LLM PingIt] Preflight: " + results.map((r) =>
+    `${r.label}=${!r.hasTab ? "no tab" : (r.fresh ? "fresh" : "existing chat")}${r.messages ? ` (${r.messages} msgs)` : ""}`).join(", "));
+  return { ok: true, results };
+}
+
+async function openFreshTabs({ targetIds, windowId }) {
+  const opened = {};
+  const failed = [];
+  for (const id of targetIds || []) {
+    const target = TARGETS[id];
+    if (!target) continue;
+    try {
+      const tab = await chrome.tabs.create({ url: target.url, windowId: windowId || undefined, active: false });
+      await waitForTabLoad(tab.id);
+      await sleep(1500);
+      opened[id] = tab.id;
+      console.log(`[LLM PingIt] Opened a fresh ${target.label} tab (${tab.id})`);
+    } catch (e) {
+      failed.push(`${target.label} (${e.message})`);
+      console.error(`[LLM PingIt] Could not open a ${target.label} tab:`, e.message);
+    }
+  }
+  // Attempted vs opened vs failed, not one number for three facts.
+  console.log(`[LLM PingIt] Fresh tabs: attempted ${(targetIds || []).length}, opened ${Object.keys(opened).length}, failed ${failed.length}`);
+  if (failed.length) return { ok: false, error: `Could not open: ${failed.join(", ")}`, opened };
+  return { ok: true, opened };
+}
+
+async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExistingChats, tabIds }) {
   await ready;   // never build a session on top of a half-restored one
   if (!TARGETS[llmA] || !TARGETS[llmB]) {
     return { ok: false, error: "Unknown LLM selected." };
@@ -457,21 +539,18 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId }) {
   const rounds = clampRounds(maxRounds, MIN_ROUNDS, MAX_ROUNDS);
   const modeId = MODES[mode] ? mode : "raw";
   if (mode && !MODES[mode]) console.log(`[LLM PingIt] Unknown mode "${mode}", falling back to raw`);
-  const allTabs = await chrome.tabs.query({});
 
-  function pickTab(targetId) {
-    const match = TARGETS[targetId].match;
-    const matching = allTabs.filter((t) => t.url && t.url.includes(match));
-    if (matching.length === 0) return null;
-    if (windowId) {
-      const sameWindow = matching.find((t) => t.windowId === windowId);
-      if (sameWindow) return sameWindow;
-    }
-    return matching.find((t) => t.active) || matching[matching.length - 1];
+  // Explicit tab ids win when the caller has just opened fresh tabs — re-resolving
+  // by host match would find the stale tab that prompted opening a new one.
+  let aTab = null;
+  let bTab = null;
+  if (tabIds && tabIds[llmA] && tabIds[llmB]) {
+    [aTab, bTab] = await Promise.all([getTabSafe(tabIds[llmA]), getTabSafe(tabIds[llmB])]);
+  } else {
+    const allTabs = await chrome.tabs.query({});
+    aTab = findTabFor(llmA, allTabs, windowId);
+    bTab = findTabFor(llmB, allTabs, windowId);
   }
-
-  const aTab = pickTab(llmA);
-  const bTab = pickTab(llmB);
 
   // This used to return here with active already set to true and polling never
   // started, so the popup showed a live session that could never run.
@@ -485,7 +564,26 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId }) {
     chainState.lastError = error;
     persistChainState();
     broadcastChainState();
-    return { ok: false, error };
+    return { ok: false, code: "no-tab", error };
+  }
+
+  // A tab carrying an existing conversation biases both models with history the
+  // user did not intend to include, and the first capture can read an old message.
+  // Refused by default and overridable, and enforced here rather than only in the
+  // popup — the same reason the A≠B guard lives here.
+  if (!allowExistingChats) {
+    const stale = [];
+    if (!isFreshChatUrl(llmA, aTab.url)) stale.push(TARGETS[llmA].label);
+    if (!isFreshChatUrl(llmB, bTab.url)) stale.push(TARGETS[llmB].label);
+    if (stale.length > 0) {
+      const error = `${stale.join(" and ")} ${stale.length > 1 ? "are" : "is"} on an existing chat.`;
+      console.log("[LLM PingIt] " + error + " Refusing to start without an override.");
+      chainState = freshChainState();
+      chainState.lastError = error;
+      persistChainState();
+      broadcastChainState();
+      return { ok: false, code: "existing-chat", error, stale };
+    }
   }
 
   chainState = freshChainState();

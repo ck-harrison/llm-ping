@@ -90,6 +90,10 @@ canary "Target registry parity" \
   "a default hotkey whose VALUE differs between content.js and popup.js (keys still match)" \
   "perl -0pi -e 's/    gemini:    \{ ctrl: true, shift: true, alt: false, key: \"3\" \},/    gemini:    { ctrl: true, shift: true, alt: false, key: \"9\" },/' content.js"
 
+canary "Target registry parity" \
+  "a target with no CHAT_URL_PATTERNS entry, which would always read as a fresh chat" \
+  "perl -pi -e 's/^    grok:/    grokk:/' shared.js"
+
 canary "Script load order" \
   "content.js listed before shared.js in the manifest" \
   "perl -0pi -e 's/\"js\": \[\"shared.js\", \"content.js\"\]/\"js\": [\"content.js\", \"shared.js\"]/' manifest.json"

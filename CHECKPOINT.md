@@ -260,6 +260,29 @@ reporting success. The failure was not that a check was missing — `submitted` 
 right there — it was that the check could pass without the thing it named ever
 having happened.
 
+## v3.5.0 — preflight before start (2026-08-10)
+
+Start now checks both tabs before a session begins, because a tab carrying an
+existing conversation feeds both models history the user did not choose to include
+and the first capture can read a message from before the session.
+
+- Freshness is decided from the **URL** (`CHAT_URL_PATTERNS`), not the message
+  count. A fresh chat can already show a greeting bubble that the selectors count
+  as a message — deciding on count would flag every fresh Grok tab as stale. The
+  count is shown to the user as context only.
+- Two ways out: **Open fresh tabs & start** (opens new-chat tabs for anything
+  missing or mid-conversation and starts on those exact tab ids, so the background
+  cannot re-resolve to the stale tab) or **Start on the existing chats**.
+- The override button is hidden when a tab is missing — there would be no chat to
+  start on, and it would fail in the background anyway.
+- `startChain` enforces the rule itself; the popup is not the only guard. Same
+  reasoning as the A≠B check.
+- Gate now asserts every target has a chat-url pattern: one added without it would
+  silently always read as fresh.
+
+Verified in a real Chrome: pressing Start with no tabs open shows
+"ChatGPT and Claude are not open" and offers only the button that can work.
+
 ## STILL not verified — needs your logged-in browser
 
 A throwaway profile has no accounts, and the two Cloudflare-gated sites cannot be

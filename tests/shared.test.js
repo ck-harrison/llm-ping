@@ -18,6 +18,9 @@ const {
   clampRounds,
   MODES,
   formatTranscript,
+  CHAT_URL_PATTERNS,
+  isFreshChatUrl,
+  summarisePreflight,
 } = require("../shared.js");
 
 // ── load safety ────────────────────────────────────────────────────────────
@@ -100,6 +103,78 @@ test("applyWrapper does not interpret $ patterns in the captured text", () => {
   assert.equal(applyWrapper("[{TEXT}]", "$`backtick"), "[$`backtick]");
   assert.equal(applyWrapper("[{TEXT}]", "$1 and $'"), "[$1 and $']");
   assert.equal(applyWrapper("[{TEXT}]", "$$double"), "[$$double]");
+});
+
+// ── Fresh-chat detection ───────────────────────────────────────────────────
+
+test("isFreshChatUrl tells a new chat from an existing conversation", () => {
+  const fresh = {
+    claude: ["https://claude.ai/new", "https://claude.ai/"],
+    chatgpt: ["https://chatgpt.com/", "https://chatgpt.com/?model=auto"],
+    gemini: ["https://gemini.google.com/app", "https://gemini.google.com/app/"],
+    copilot: ["https://copilot.microsoft.com/"],
+    grok: ["https://grok.com/", "https://grok.com/?ref=x"],
+  };
+  const existing = {
+    claude: ["https://claude.ai/chat/abc-123"],
+    chatgpt: ["https://chatgpt.com/c/abc-123", "https://chatgpt.com/g/g-x/c/abc"],
+    gemini: ["https://gemini.google.com/app/9f8e7d6c"],
+    copilot: ["https://copilot.microsoft.com/chats/abc123"],
+    grok: ["https://grok.com/chat/abc-123"],
+  };
+  for (const [id, urls] of Object.entries(fresh)) {
+    for (const u of urls) assert.equal(isFreshChatUrl(id, u), true, `${id} ${u} should read as fresh`);
+  }
+  for (const [id, urls] of Object.entries(existing)) {
+    for (const u of urls) assert.equal(isFreshChatUrl(id, u), false, `${id} ${u} should read as an existing chat`);
+  }
+});
+
+test("isFreshChatUrl never blocks on a missing url or unknown target", () => {
+  // A tab we cannot read must not read as fresh…
+  assert.equal(isFreshChatUrl("claude", null), false);
+  assert.equal(isFreshChatUrl("claude", ""), false);
+  // …but an unknown target must not block the user either.
+  assert.equal(isFreshChatUrl("somethingnew", "https://example.com/chat/1"), true);
+});
+
+test("every target has a chat-url pattern", () => {
+  // A new site added without one would silently always read as fresh.
+  assert.deepEqual(
+    Object.keys(CHAT_URL_PATTERNS).sort(),
+    ["chatgpt", "claude", "copilot", "gemini", "grok"]
+  );
+});
+
+test("summarisePreflight names what is wrong, and says nothing when all is well", () => {
+  const ok = summarisePreflight([
+    { label: "Claude", hasTab: true, fresh: true },
+    { label: "Grok", hasTab: true, fresh: true },
+  ]);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.message, "");
+
+  const missing = summarisePreflight([
+    { label: "Claude", hasTab: false, fresh: false },
+    { label: "Grok", hasTab: true, fresh: true },
+  ]);
+  assert.equal(missing.ok, false);
+  assert.equal(missing.message, "Claude is not open");
+
+  const both = summarisePreflight([
+    { label: "Claude", hasTab: false, fresh: false },
+    { label: "Grok", hasTab: true, fresh: false },
+  ]);
+  assert.equal(both.message, "Claude is not open, and Grok is on an existing chat");
+
+  const plural = summarisePreflight([
+    { label: "Claude", hasTab: true, fresh: false },
+    { label: "Grok", hasTab: true, fresh: false },
+  ]);
+  assert.equal(plural.message, "Claude and Grok are on an existing chat");
+
+  assert.equal(summarisePreflight([]).ok, true);
+  assert.equal(summarisePreflight(null).ok, true);
 });
 
 // ── MODES ──────────────────────────────────────────────────────────────────

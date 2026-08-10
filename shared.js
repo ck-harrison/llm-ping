@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.4.2 ──
+// ── LLM PingIt – Shared pure helpers v3.5.0 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -118,6 +118,52 @@
     }
 
     return lines.join("\n").trim() + "\n";
+  }
+
+  // ── Fresh-chat detection ─────────────────────────────────────────────────
+  // Whether a tab is sitting on an existing conversation, decided from the URL.
+  // The URL is the reliable signal: every one of these sites puts a conversation
+  // id in the path. Message count is NOT used for the decision, deliberately — a
+  // fresh chat can already show a greeting bubble that the selectors count as a
+  // message, which would flag every fresh Grok tab as stale. Count is reported
+  // alongside as context for the user, not as the verdict.
+  var CHAT_URL_PATTERNS = {
+    claude:  /\/chat\//,
+    chatgpt: /\/c\//,
+    gemini:  /\/app\/[^/?#]+/,
+    copilot: /\/chats?\/[^/?#]+/,
+    grok:    /\/chat\//,
+  };
+
+  function isFreshChatUrl(targetId, url) {
+    if (!url) return false;
+    var pattern = CHAT_URL_PATTERNS[targetId];
+    if (!pattern) return true;   // unknown target: do not block the user
+    return !pattern.test(url);
+  }
+
+  // Turn preflight results into something a person can act on. Pure so the
+  // wording is testable without a browser.
+  function summarisePreflight(results) {
+    var missing = [];
+    var stale = [];
+    (results || []).forEach(function (r) {
+      if (!r.hasTab) missing.push(r.label);
+      else if (!r.fresh) stale.push(r.label);
+    });
+    var parts = [];
+    if (missing.length) {
+      parts.push(missing.join(" and ") + (missing.length > 1 ? " are" : " is") + " not open");
+    }
+    if (stale.length) {
+      parts.push(stale.join(" and ") + (stale.length > 1 ? " are" : " is") + " on an existing chat");
+    }
+    return {
+      ok: parts.length === 0,
+      missing: missing,
+      stale: stale,
+      message: parts.join(", and "),
+    };
   }
 
   // ── Ping Pong poll state machine ─────────────────────────────────────────
@@ -243,6 +289,9 @@
     applyWrapper: applyWrapper,
     MODES: MODES,
     formatTranscript: formatTranscript,
+    CHAT_URL_PATTERNS: CHAT_URL_PATTERNS,
+    isFreshChatUrl: isFreshChatUrl,
+    summarisePreflight: summarisePreflight,
     advancePollPhase: advancePollPhase,
     newPollState: newPollState,
     shouldBounce: shouldBounce,

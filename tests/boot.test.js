@@ -176,6 +176,50 @@ test("a failed start leaves the chain inactive and explains itself", async () =>
   assert.match(state.lastError, /No open tab/);
 });
 
+test("preflightChain reports a missing tab and an existing chat", async () => {
+  const { calls } = bootBackground([
+    { id: 1, windowId: 1, url: "https://claude.ai/chat/an-old-conversation", active: true },
+  ]);
+  const res = await ask(calls, { action: "preflightChain", llmA: "claude", llmB: "chatgpt", windowId: 1 });
+  assert.equal(res.ok, true);
+  const claude = res.results.find((r) => r.targetId === "claude");
+  const chatgpt = res.results.find((r) => r.targetId === "chatgpt");
+  assert.equal(claude.hasTab, true);
+  assert.equal(claude.fresh, false, "a /chat/ url is an existing conversation");
+  assert.equal(chatgpt.hasTab, false, "no ChatGPT tab is open");
+});
+
+test("preflightChain passes two fresh tabs", async () => {
+  const { calls } = bootBackground([
+    { id: 1, windowId: 1, url: "https://claude.ai/new", active: true },
+    { id: 2, windowId: 1, url: "https://chatgpt.com/", active: false },
+  ]);
+  const res = await ask(calls, { action: "preflightChain", llmA: "claude", llmB: "chatgpt", windowId: 1 });
+  assert.ok(res.results.every((r) => r.hasTab && r.fresh), JSON.stringify(res.results));
+});
+
+test("startChain refuses an existing chat, and the override lets it through", async () => {
+  const tabs = [
+    { id: 1, windowId: 1, url: "https://claude.ai/chat/an-old-conversation", active: true },
+    { id: 2, windowId: 1, url: "https://chatgpt.com/", active: false },
+  ];
+
+  const blocked = bootBackground(tabs);
+  const refused = await ask(blocked.calls, { action: "startChain", llmA: "claude", llmB: "chatgpt", maxRounds: 2 });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "existing-chat");
+  assert.match(refused.error, /Claude is on an existing chat/);
+
+  // Enforced in the background, not only in the popup — so the override has to be
+  // explicit rather than the popup simply choosing not to check.
+  const allowed = bootBackground(tabs);
+  const started = await ask(allowed.calls, {
+    action: "startChain", llmA: "claude", llmB: "chatgpt", maxRounds: 2, allowExistingChats: true,
+  });
+  assert.equal(started.ok, true, "the override must let it through");
+  await ask(allowed.calls, { action: "stopChain" });   // clears the poll interval
+});
+
 test("getTranscript returns empty rather than a malformed document", async () => {
   const { calls } = bootBackground();
   const result = await ask(calls, { action: "getTranscript" });

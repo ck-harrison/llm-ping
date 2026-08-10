@@ -238,6 +238,12 @@ check("Target registry parity", () => {
     }
   }
   if (selectors.length !== bg.length) problems.push(`${bg.length} targets but ${selectors.length} MESSAGE_SELECTORS domains`);
+
+  // A target with no chat-url pattern always reads as a fresh chat, so the
+  // preflight would wave through an existing conversation on that site.
+  const chatPatterns = extractBlockKeys(read("shared.js"), "var CHAT_URL_PATTERNS = {");
+  if (!chatPatterns) problems.push("CHAT_URL_PATTERNS not found in shared.js");
+  else if (!same(chatPatterns, bg)) problems.push(`CHAT_URL_PATTERNS [${chatPatterns}] vs TARGETS [${bg}]`);
   for (const m of bgMatches) {
     if (!selectors.some((d) => d === m || d.includes(m) || m.includes(d))) {
       problems.push(`no MESSAGE_SELECTORS entry for host match "${m}"`);

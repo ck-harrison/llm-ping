@@ -82,6 +82,10 @@ Lives in `shared.js` as `advancePollPhase(state, obs, now, cfg)` — pure, so `t
 
 **Tab identity:** the chain pins `tabA`/`tabB` ids at start and every bounce and every sender lookup uses those ids. Never re-resolve a chain tab by host-substring match — with two tabs of the same site open, the chain injected into one and polled the other.
 
+**Preflight:** pressing Start runs `preflightChain` before anything else — read-only, opens nothing. Both tabs must exist and be on a fresh chat. Freshness is decided from the **URL** (`CHAT_URL_PATTERNS` in shared.js), not the message count: a fresh chat can already show a greeting bubble that the selectors count as a message, which would flag every fresh Grok tab as stale. The count is reported to the user as context, never as the verdict.
+
+The user then gets **Open fresh tabs & start** (opens a new-chat tab for anything missing or mid-conversation, then starts on those exact tab ids) or **Start on the existing chats** (the override). The override button is hidden when a tab is missing, since there would be no chat to start on. `startChain` enforces the freshness rule itself and needs `allowExistingChats: true` to bypass it — the popup is not trusted to be the only guard, for the same reason as the A≠B check.
+
 **Modes:** `MODES` lives in `shared.js` only. The context menu and the Ping Pong dropdown both build from it, so they cannot offer different sets — that is why there is no parity check between them, and why the gate instead forbids a second `MODES` declaration. Every non-raw wrapper must contain `{TEXT}`; without it the instruction is sent and the captured response is silently dropped.
 
 **In-page HUD:** `pushHud()` sends round counter, Stop, and Copy transcript to both chain tabs on every state change. The popup closes the moment you click into the tab you are watching, so it cannot be the only control surface for a running session.

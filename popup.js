@@ -1,4 +1,4 @@
-// ── LLM PingIt – Popup v3.4.2 ──
+// ── LLM PingIt – Popup v3.5.0 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {
@@ -176,6 +176,8 @@ const chainMode = document.getElementById("chainMode");
 const chainRounds = document.getElementById("chainRounds");
 const btnStart = document.getElementById("btnStart");
 const btnStop = document.getElementById("btnStop");
+const btnOpenFresh = document.getElementById("btnOpenFresh");
+const btnStartAnyway = document.getElementById("btnStartAnyway");
 const btnCopyTranscript = document.getElementById("btnCopyTranscript");
 const chainStatus = document.getElementById("chainStatus");
 
@@ -239,6 +241,21 @@ chainRounds.addEventListener("change", () => {
   chrome.storage.sync.set({ chainRounds: rounds });
 });
 
+// Held between the preflight and whichever way out of it the user picks.
+let pendingPreflight = null;
+
+// "Start on the existing chats" is only offered when every tab actually exists.
+// With a tab missing there is no chat to start on, and the override would fail in
+// the background anyway — offering it would be a button that cannot work.
+function showPreflightChoices(show, canUseExisting) {
+  btnOpenFresh.style.display = show ? "block" : "none";
+  btnStartAnyway.style.display = (show && canUseExisting) ? "block" : "none";
+  btnStart.style.display = show ? "none" : "block";
+}
+
+// Both tabs open and on fresh chats before a session begins. An existing
+// conversation feeds both models history the user did not choose to include, and
+// the first capture can read a message from before the session started.
 btnStart.addEventListener("click", () => {
   if (chainA.value === chainB.value) {
     setStatus("⚠️ Pick two different LLMs");
@@ -247,38 +264,105 @@ btnStart.addEventListener("click", () => {
 
   const rounds = clampRounds(chainRounds.value, MIN_ROUNDS, MAX_ROUNDS);
   chainRounds.value = rounds;
-  setStatus("Starting…");
+  setStatus("Checking tabs…");
   btnStart.disabled = true;
 
   chrome.windows.getCurrent((win) => {
     chrome.runtime.sendMessage({
-      action: "startChain",
-      llmA: chainA.value,
-      llmB: chainB.value,
-      mode: chainMode.value,
-      maxRounds: rounds,
-      windowId: win.id,
-    }, (response) => {
+      action: "preflightChain", llmA: chainA.value, llmB: chainB.value, windowId: win.id,
+    }, (res) => {
       btnStart.disabled = false;
-      // Reading lastError is what marks it handled; leaving it unread logs an
-      // "Unchecked runtime.lastError" warning on every failed send.
       const err = chrome.runtime.lastError;
-      // Only draw a live session once the background confirms one. Drawing it
-      // optimistically hid the case where a tab was missing and the session
-      // was never actually running.
-      // The explicit 0 matters: a new session has no transcript, and a failed
-      // start resets chainState. Omitting it leaves updateUI remembering the
-      // previous session's count, so Copy transcript stays visible and then
-      // reports that there is nothing to copy.
-      if (err || !response || !response.ok) {
-        updateUI(false, 0, rounds, 0);
-        setStatus("⚠️ " + ((response && response.error) || (err && err.message) || "Could not start Ping Pong"));
+      if (err || !res || !res.ok) {
+        setStatus("⚠️ " + ((res && res.error) || (err && err.message) || "Could not check the tabs"));
         return;
       }
-      updateUI(true, 0, rounds, 0);
+
+      const summary = summarisePreflight(res.results);
+      if (summary.ok) {
+        startSession(win.id, {});
+        return;
+      }
+
+      pendingPreflight = { windowId: win.id, results: res.results };
+      const counts = res.results
+        .filter((r) => r.hasTab && !r.fresh && r.messages)
+        .map((r) => `${r.label}: ${r.messages} messages`);
+      setStatus("⚠️ " + summary.message + (counts.length ? ` (${counts.join(", ")})` : ""));
+      showPreflightChoices(true, summary.missing.length === 0);
     });
   });
 });
+
+// Open a fresh tab for anything missing or mid-conversation, then start on those
+// specific tabs — passing their ids so the background cannot re-resolve back to
+// the stale tab that prompted this.
+btnOpenFresh.addEventListener("click", () => {
+  if (!pendingPreflight) return;
+  const needed = pendingPreflight.results.filter((r) => !r.hasTab || !r.fresh).map((r) => r.targetId);
+  setStatus("Opening fresh tabs…");
+  btnOpenFresh.disabled = true;
+
+  chrome.runtime.sendMessage({
+    action: "openFreshTabs", targetIds: needed, windowId: pendingPreflight.windowId,
+  }, (res) => {
+    btnOpenFresh.disabled = false;
+    const err = chrome.runtime.lastError;
+    if (err || !res || !res.ok) {
+      setStatus("⚠️ " + ((res && res.error) || (err && err.message) || "Could not open the tabs"));
+      return;
+    }
+    const tabIds = {};
+    for (const r of pendingPreflight.results) {
+      if (r.hasTab && r.fresh) tabIds[r.targetId] = r.tabId;
+    }
+    Object.assign(tabIds, res.opened);
+    showPreflightChoices(false, false);
+    startSession(pendingPreflight.windowId, { tabIds });
+  });
+});
+
+btnStartAnyway.addEventListener("click", () => {
+  if (!pendingPreflight) return;
+  showPreflightChoices(false, false);
+  startSession(pendingPreflight.windowId, { allowExistingChats: true });
+});
+
+function startSession(windowId, opts) {
+  const rounds = clampRounds(chainRounds.value, MIN_ROUNDS, MAX_ROUNDS);
+  setStatus("Starting…");
+  btnStart.disabled = true;
+
+  chrome.runtime.sendMessage({
+    action: "startChain",
+    llmA: chainA.value,
+    llmB: chainB.value,
+    mode: chainMode.value,
+    maxRounds: rounds,
+    windowId,
+    allowExistingChats: !!opts.allowExistingChats,
+    tabIds: opts.tabIds || null,
+  }, (response) => {
+    btnStart.disabled = false;
+    // Reading lastError is what marks it handled; leaving it unread logs an
+    // "Unchecked runtime.lastError" warning on every failed send.
+    const err = chrome.runtime.lastError;
+    // Only draw a live session once the background confirms one. Drawing it
+    // optimistically hid the case where a tab was missing and the session
+    // was never actually running.
+    // The explicit 0 matters: a new session has no transcript, and a failed
+    // start resets chainState. Omitting it leaves updateUI remembering the
+    // previous session's count, so Copy transcript stays visible and then
+    // reports that there is nothing to copy.
+    if (err || !response || !response.ok) {
+      updateUI(false, 0, rounds, 0);
+      setStatus("⚠️ " + ((response && response.error) || (err && err.message) || "Could not start Ping Pong"));
+      return;
+    }
+    pendingPreflight = null;
+    updateUI(true, 0, rounds, 0);
+  });
+}
 
 btnStop.addEventListener("click", () => {
   chrome.runtime.sendMessage({ action: "stopChain" });
@@ -311,6 +395,11 @@ function setStatus(text, active) {
 }
 
 function updateUI(active, currentRound = 0, maxRounds = 5, transcriptEntries) {
+  // A live session clears any half-answered preflight prompt.
+  if (active) {
+    btnOpenFresh.style.display = "none";
+    btnStartAnyway.style.display = "none";
+  }
   btnStart.style.display = active ? "none" : "block";
   btnStop.style.display = active ? "block" : "none";
   chainA.disabled = active;
