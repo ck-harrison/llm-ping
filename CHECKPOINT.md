@@ -5,8 +5,8 @@ State of the world. Read this first; update it before the session ends.
 **Last updated:** 2026-08-10
 **Version:** 3.4.0 (3.2.0 → 3.3.0 review fixes → 3.4.0 features)
 **Modes:** BUILD
-**Git:** `main` pushed to origin through the v3.3.0 review fixes (`2811477`). The
-v3.4.0 features below are **uncommitted** at the time of writing.
+**Git:** `main` pushed to origin. The audit fixes below the v3.4.0 section are the
+only work that may be uncommitted; check `git status`.
 
 ---
 
@@ -14,7 +14,7 @@ v3.4.0 features below are **uncommitted** at the time of writing.
 
 Working Chrome MV3 extension, not yet published to the Chrome Web Store. Five
 supported sites (Claude, ChatGPT, Gemini, Copilot, Grok). No build step, no
-dependencies, 2,050 lines of shipping vanilla JS plus ~725 in tests and tooling.
+dependencies, 2,459 lines of shipping vanilla JS plus 1,219 in tests and tooling.
 
 A full review on 2026-08-10 found 21 issues and all the code ones are fixed. What
 changed, in order of how much it mattered:
@@ -26,7 +26,7 @@ just stopped":
   injected into one and polled the other.
 - The content script caught its own injection failures, fell back to the
   clipboard, and reported success — so the chain waited forever for a reply to a
-  message that was never sent. It now reports `{ok, submitted}` and a failed
+  message that was never sent. It now reports `{ok, clicked, submitted}` and a failed
   bounce stops the session with a toast.
 - `startChain` returned early on a missing tab *after* setting `active: true` and
   before starting the poller, so the popup showed a live session that could never
@@ -63,7 +63,7 @@ logging convention requires.
 
 ---
 
-## Second review pass (2026-08-10, uncommitted)
+## Second review pass (2026-08-10)
 
 A review of the v3.3.0 code itself found six defects introduced by that work:
 
@@ -114,10 +114,35 @@ Gate is now 11 checks, all 13 canaries fire.
    the popup and the HUD, mid-session or after.
 
 Two honesty details worth keeping: the transcript states that the opening prompt
-was never captured (nothing reads the composer), and the ~2 MB cap records itself
+was never captured (nothing reads the composer), and the transcript cap records itself
 in the output as INCOMPLETE rather than quietly dropping the tail.
 
-Gate is now 12 checks with 15 canaries; 29 unit tests.
+Gate is now 12 checks with 15 canaries; 44 tests.
+
+### Audit of the v3.4.0 work itself
+
+Asked whether the features introduced problems. Three did:
+
+- **Transcript cap was 2 MB**, and the whole chainState — transcript included — is
+  written to `chrome.storage.session` on every bounce. Session storage has a byte
+  quota that differs by Chrome version, and `persistChainState` only *logs* a
+  failed write, so a long session would have quietly stopped being resumable. Cap
+  lowered to 500k characters (~80,000 words), far above any real session.
+- **`updateUI` remembered the previous session's transcript count**, so starting a
+  new session left Copy transcript visible until it was clicked and reported
+  nothing to copy. The start paths now pass 0 explicitly.
+- **A new boot test was decorative.** "Grok never reports streaming" passed with
+  the rule deleted, because the stub returned no stop button either way. The stub
+  can now produce a visible stop button: Claude reports streaming, Grok must still
+  not. Removing the early return now fails that test.
+
+Also added `tests/boot.test.js`: evaluates background.js and content.js against
+stubbed `chrome.*` APIs and drives their message handlers. This covers the class
+of bug `node -c` cannot see — a module-level ReferenceError that parses fine and
+then kills the service worker on load, leaving every other gate check green. It
+verified by canary: breaking `importScripts("shared.js")` fails all ten background
+tests, removing the content.js single-load guard fails only the guard test, and
+deleting the A≠B guard fails only that one.
 
 ## Verified
 

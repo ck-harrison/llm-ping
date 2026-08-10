@@ -179,6 +179,11 @@ const btnStop = document.getElementById("btnStop");
 const btnCopyTranscript = document.getElementById("btnCopyTranscript");
 const chainStatus = document.getElementById("chainStatus");
 
+// Declared with the elements rather than beside updateUI: every caller of updateUI
+// is an async chrome callback so a temporal-dead-zone error was not reachable, but
+// a popup that throws on open is invisible until someone opens it.
+let lastTranscriptEntries = 0;
+
 for (const [id, target] of Object.entries(TARGETS)) {
   const optA = document.createElement("option"); optA.value = id; optA.textContent = target.label;
   const optB = document.createElement("option"); optB.value = id; optB.textContent = target.label;
@@ -259,12 +264,16 @@ btnStart.addEventListener("click", () => {
       // Only draw a live session once the background confirms one. Drawing it
       // optimistically hid the case where a tab was missing and the session
       // was never actually running.
+      // The explicit 0 matters: a new session has no transcript, and a failed
+      // start resets chainState. Omitting it leaves updateUI remembering the
+      // previous session's count, so Copy transcript stays visible and then
+      // reports that there is nothing to copy.
       if (err || !response || !response.ok) {
-        updateUI(false, 0, rounds);
+        updateUI(false, 0, rounds, 0);
         setStatus("⚠️ " + ((response && response.error) || (err && err.message) || "Could not start Ping Pong"));
         return;
       }
-      updateUI(true, 0, rounds);
+      updateUI(true, 0, rounds, 0);
     });
   });
 });
@@ -298,8 +307,6 @@ function setStatus(text, active) {
   chainStatus.textContent = text;
   chainStatus.className = active ? "chain-status active" : "chain-status";
 }
-
-let lastTranscriptEntries = 0;
 
 function updateUI(active, currentRound = 0, maxRounds = 5, transcriptEntries) {
   btnStart.style.display = active ? "none" : "block";

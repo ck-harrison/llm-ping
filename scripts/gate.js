@@ -122,7 +122,7 @@ check("Unit tests", () => {
   return {
     ok: ok && fail === 0,
     detail: `${total} tests, ${pass} pass, ${fail} fail`,
-    notProven: "anything about DOM injection, chrome.* messaging, or the live sites — only the pure helpers in shared.js are covered",
+    notProven: "anything about the live sites. Covered: the pure helpers, plus background.js and content.js evaluating and answering messages against hand-rolled chrome.* stubs. NOT covered: real selectors, injection, submission, clipboard, or whether Chrome accepts the manifest",
   };
 });
 

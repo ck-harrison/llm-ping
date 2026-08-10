@@ -17,7 +17,13 @@ const TARGETS = {
 // context menu cannot drift apart.
 
 const POLL_INTERVAL_MS = 1000;
-const TRANSCRIPT_LIMIT_CHARS = 2000000;
+// The whole chainState object — transcript included — is written to
+// chrome.storage.session on every bounce, and session storage has a byte quota
+// that differs across Chrome versions. A cap of 2 MB could push the persisted
+// object past it, and persistChainState only logs that failure: the session would
+// quietly stop being resumable. 500k characters is roughly 80,000 words, far more
+// than a 50-round session produces, and keeps the write comfortably small.
+const TRANSCRIPT_LIMIT_CHARS = 500000;
 const STALL_TIMEOUT_MS = 180000;   // 3 min with no state change → stop and say so
 const MAX_POLL_FAILURES = 5;       // consecutive getStatus failures on one tab
 const MIN_ROUNDS = ROUND_LIMITS.MIN;

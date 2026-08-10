@@ -1,6 +1,6 @@
 # LLM PingIt
 
-Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,050 lines of shipping vanilla JS plus ~725 in tests and tooling.
+Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,459 lines of shipping vanilla JS plus 1,219 in tests and tooling.
 
 ## Architecture
 
@@ -19,7 +19,9 @@ LICENSE         → MIT. Ships inside the store zip, as MIT requires of distribu
 scripts/gate.js → Quality gate. Prints denominators and what each check does not prove
 scripts/canary.sh  → Plants each gate check's own violation and asserts it goes red
 scripts/package.sh → Store zip from an explicit allowlist
-tests/          → node --test over shared.js
+tests/          → node --test. shared.test.js covers the pure helpers;
+                  boot.test.js evaluates background.js and content.js against
+                  stubbed chrome.* APIs and drives their message handlers
 CHECKPOINT.md   → State of the world. Read first, update last
 ```
 
