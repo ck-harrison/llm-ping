@@ -744,7 +744,11 @@ async function handleResponseComplete(senderTabId) {
   try {
     const response = await sendMessageToTab(senderTabId, { action: "getFullMessage" });
     text = response?.text || "";
-    console.log(`[LLM PingIt] Fetched ${text.length} chars from ${senderTargetId}`);
+    // Log what was captured, not just how much. A capture that grabs the wrong
+    // element looks identical to a correct one in a byte count — a real session
+    // bounced Grok's static greeting for eight rounds and the log said only
+    // "Fetched 33 chars", which was true and useless.
+    console.log(`[LLM PingIt] Captured ${text.length} chars from ${senderTargetId}: "${text.slice(0, 100).replace(/\s+/g, " ")}${text.length > 100 ? "…" : ""}"`);
   } catch (e) {
     console.error(`[LLM PingIt] Failed to fetch text from ${senderTargetId}:`, e.message);
     await resetTabToIdle(senderTabId);
