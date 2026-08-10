@@ -70,9 +70,13 @@ canary "Log prefix convention" \
   "a console.log with no [LLM PingIt] prefix" \
   "printf '\nconsole.log(\"canary without a prefix\");\n' >> popup.js"
 
+# Matches whatever version README currently states rather than a pinned literal.
+# The pinned version of this plant silently stopped planting anything the first
+# time the project was released, and the canary then reported a green Version sync
+# check as a real pass.
 canary "Version sync" \
   "README version bumped out of step with the manifest" \
-  "perl -pi -e 's/^3\.3\.0\$/9.9.9/' README.md"
+  "perl -pi -e 's/^\d+\.\d+\.\d+\$/9.9.9/' README.md"
 
 canary "No raw hex outside styling files" \
   "a raw hex colour in background.js" \
@@ -93,6 +97,14 @@ canary "Script load order" \
 canary "Script load order" \
   "an executeScript that injects content.js without shared.js" \
   "perl -0pi -e 's/files: \[\"shared.js\", \"content.js\"\]/files: [\"content.js\"]/' background.js"
+
+canary "Mode registry single source" \
+  "a second MODES copy reintroduced in background.js" \
+  "printf '\nconst MODES = { raw: { label: \"x\", wrapper: null } };\n' >> background.js"
+
+canary "Mode registry single source" \
+  "a mode wrapper missing the {TEXT} placeholder" \
+  "perl -0pi -e 's/Please expand on it — add depth, examples, and anything important that was missed:\\\\n\\\\n---\\\\n\{TEXT\}\\\\n---/Please expand on it./' shared.js"
 
 canary "Host surface parity" \
   "a host_permission that no target and no content script uses" \

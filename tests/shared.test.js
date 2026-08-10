@@ -16,6 +16,8 @@ const {
   newPollState,
   shouldBounce,
   clampRounds,
+  MODES,
+  formatTranscript,
 } = require("../shared.js");
 
 // ── load safety ────────────────────────────────────────────────────────────
@@ -79,6 +81,69 @@ test("applyWrapper does not interpret $ patterns in the captured text", () => {
   assert.equal(applyWrapper("[{TEXT}]", "$`backtick"), "[$`backtick]");
   assert.equal(applyWrapper("[{TEXT}]", "$1 and $'"), "[$1 and $']");
   assert.equal(applyWrapper("[{TEXT}]", "$$double"), "[$$double]");
+});
+
+// ── MODES ──────────────────────────────────────────────────────────────────
+
+test("every mode has a label, and every wrapper carries the {TEXT} placeholder", () => {
+  // A wrapper missing {TEXT} silently drops the captured response and sends only
+  // the instruction — the AI would answer a question it cannot see.
+  assert.ok(Object.keys(MODES).length >= 2);
+  assert.equal(MODES.raw.wrapper, null, "raw must pass text through untouched");
+  for (const [id, mode] of Object.entries(MODES)) {
+    assert.equal(typeof mode.label, "string", `${id} needs a label`);
+    assert.ok(mode.label.length > 0, `${id} label must not be empty`);
+    if (id === "raw") continue;
+    assert.ok(mode.wrapper, `${id} needs a wrapper`);
+    assert.ok(mode.wrapper.includes("{TEXT}"), `${id} wrapper must contain {TEXT}`);
+    assert.equal(applyWrapper(mode.wrapper, "CAPTURED").includes("CAPTURED"), true, `${id} must carry the text through`);
+  }
+});
+
+// ── formatTranscript ───────────────────────────────────────────────────────
+
+const ENTRIES = [
+  { seq: 1, targetId: "claude", label: "Claude", text: "First answer." },
+  { seq: 2, targetId: "chatgpt", label: "ChatGPT", text: "Second answer." },
+];
+
+test("formatTranscript renders a header, the pair, and every entry in order", () => {
+  const out = formatTranscript(
+    { labelA: "Claude", labelB: "ChatGPT", rounds: 2, modeLabel: "Ask to critique", startedAt: "2026-08-10 18:00" },
+    ENTRIES
+  );
+  assert.match(out, /^# LLM PingIt — Claude ↔ ChatGPT/);
+  assert.match(out, /2 rounds · mode: Ask to critique · 2026-08-10 18:00/);
+  assert.match(out, /## 1 · Claude/);
+  assert.match(out, /## 2 · ChatGPT/);
+  assert.ok(out.indexOf("First answer.") < out.indexOf("Second answer."), "entries stay in order");
+  assert.ok(out.endsWith("\n"));
+});
+
+test("formatTranscript always states that the opening prompt is missing", () => {
+  // The transcript begins at the first AI response; without saying so it reads as
+  // the whole conversation.
+  const out = formatTranscript({ labelA: "A", labelB: "B", rounds: 1 }, ENTRIES);
+  assert.match(out, /opening prompt you typed is not captured/);
+});
+
+test("formatTranscript declares itself incomplete when truncated", () => {
+  const out = formatTranscript({ labelA: "A", labelB: "B", rounds: 9, truncated: true }, ENTRIES);
+  assert.match(out, /INCOMPLETE/);
+  const clean = formatTranscript({ labelA: "A", labelB: "B", rounds: 9 }, ENTRIES);
+  assert.doesNotMatch(clean, /INCOMPLETE/);
+});
+
+test("formatTranscript says so when nothing was captured", () => {
+  const out = formatTranscript({ labelA: "A", labelB: "B", rounds: 0 }, []);
+  assert.match(out, /No responses were captured/);
+});
+
+test("formatTranscript pluralises rounds and survives missing metadata", () => {
+  assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /^# LLM PingIt — \? ↔ \?/);
+  assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /1 round(?! )/);
+  assert.match(formatTranscript({ rounds: 2 }, ENTRIES), /2 rounds/);
+  assert.doesNotThrow(() => formatTranscript(null, null));
 });
 
 // ── advancePollPhase ───────────────────────────────────────────────────────

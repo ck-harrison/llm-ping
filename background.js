@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.3.0 ──
+// ── LLM PingIt – Background Service Worker v3.4.0 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -13,19 +13,15 @@ const TARGETS = {
   grok:    { label: "Grok",     url: "https://grok.com/",              match: "grok.com" },
 };
 
-const MODES = {
-  raw:      { label: "Send as-is",       wrapper: null },
-  critique: { label: "Ask to critique",  wrapper: "Here is a response from another AI model. Please critique it — identify weaknesses, missing nuance, or errors, and suggest improvements:\n\n---\n{TEXT}\n---" },
-  improve:  { label: "Ask to improve",   wrapper: "Here is a response from another AI model. Please rewrite and improve it, keeping the same intent but making it stronger, clearer, and more accurate:\n\n---\n{TEXT}\n---" },
-  compare:  { label: "Ask to compare",   wrapper: "Here is a response from another AI model to a user's question. Please provide your own independent answer to the same question, then compare your answer with the one below, noting where you agree and disagree:\n\n---\n{TEXT}\n---" },
-  expand:   { label: "Ask to expand",    wrapper: "Here is a response from another AI model. Please expand on it — add depth, examples, and anything important that was missed:\n\n---\n{TEXT}\n---" },
-};
+// MODES comes from shared.js so the popup's Ping Pong dropdown and this file's
+// context menu cannot drift apart.
 
 const POLL_INTERVAL_MS = 1000;
+const TRANSCRIPT_LIMIT_CHARS = 2000000;
 const STALL_TIMEOUT_MS = 180000;   // 3 min with no state change → stop and say so
 const MAX_POLL_FAILURES = 5;       // consecutive getStatus failures on one tab
-const MIN_ROUNDS = 1;
-const MAX_ROUNDS = 50;
+const MIN_ROUNDS = ROUND_LIMITS.MIN;
+const MAX_ROUNDS = ROUND_LIMITS.MAX;
 
 function freshChainState() {
   return {
@@ -45,7 +41,41 @@ function freshChainState() {
     stoppedReason: null,
     bouncing: false,
     consecutiveSkips: 0,
+    startedAt: null,
+    transcript: [],
+    transcriptTruncated: false,
   };
+}
+
+// Record every genuine response so the session can be copied out afterwards.
+// Bounded, and when the bound is hit it is recorded rather than silently dropping
+// the tail — a transcript that quietly stops is worse than one that says it stops.
+function appendTranscript(targetId, text) {
+  const used = chainState.transcript.reduce((n, e) => n + e.text.length, 0);
+  if (used + text.length > TRANSCRIPT_LIMIT_CHARS) {
+    if (!chainState.transcriptTruncated) {
+      chainState.transcriptTruncated = true;
+      console.log(`[LLM PingIt] Transcript limit (${TRANSCRIPT_LIMIT_CHARS} chars) reached after ${chainState.transcript.length} responses — later ones are not recorded`);
+    }
+    return;
+  }
+  chainState.transcript.push({
+    seq: chainState.transcript.length + 1,
+    targetId,
+    label: TARGETS[targetId]?.label || targetId,
+    text,
+  });
+}
+
+function buildTranscript() {
+  return formatTranscript({
+    labelA: TARGETS[chainState.llmA]?.label,
+    labelB: TARGETS[chainState.llmB]?.label,
+    rounds: chainState.currentRound,
+    modeLabel: (MODES[chainState.mode] || MODES.raw).label,
+    startedAt: chainState.startedAt,
+    truncated: chainState.transcriptTruncated,
+  }, chainState.transcript);
 }
 
 const MAX_CONSECUTIVE_SKIPS = 3;
@@ -320,6 +350,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.action === "getTranscript") {
+    ready.then(() => sendResponse({
+      text: chainState.transcript.length ? buildTranscript() : "",
+      entries: chainState.transcript.length,
+      truncated: chainState.transcriptTruncated,
+    }));
+    return true;
+  }
+
   if (msg.action === "hotkeyBounce") {
     handleHotkeyBounce(msg, sender)
       .then((result) => sendResponse(result))
@@ -354,14 +393,39 @@ function publicChainState() {
     maxRounds: chainState.maxRounds,
     llmA: chainState.llmA,
     llmB: chainState.llmB,
+    mode: chainState.mode,
     lastError: chainState.lastError,
     stoppedReason: chainState.stoppedReason,
+    transcriptEntries: chainState.transcript.length,
   };
 }
 
 function broadcastChainState() {
   chrome.runtime.sendMessage({ action: "chainStateUpdate", state: publicChainState() })
     .catch(() => {}); // popup is usually closed
+  pushHud();
+}
+
+// The popup is the wrong place to watch a session you are already watching: it
+// closes the moment you click into the page. The in-page HUD carries the round
+// counter, a Stop button and Copy transcript on both chain tabs.
+function pushHud() {
+  const state = {
+    active: chainState.active,
+    round: chainState.currentRound,
+    max: chainState.maxRounds,
+    labelA: TARGETS[chainState.llmA]?.label || null,
+    labelB: TARGETS[chainState.llmB]?.label || null,
+    reason: chainState.active ? null : (chainState.stoppedReason || chainState.lastError),
+    hasTranscript: chainState.transcript.length > 0,
+  };
+  for (const tabId of [chainState.tabA, chainState.tabB]) {
+    if (tabId == null) continue;
+    chrome.tabs.sendMessage(tabId, { action: "hud", state }).catch(() => {
+      // Tab closed or content script not present — the HUD is cosmetic, so this
+      // is not worth escalating. Poll failures are what report a dead tab.
+    });
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -380,6 +444,8 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId }) {
   }
 
   const rounds = clampRounds(maxRounds, MIN_ROUNDS, MAX_ROUNDS);
+  const modeId = MODES[mode] ? mode : "raw";
+  if (mode && !MODES[mode]) console.log(`[LLM PingIt] Unknown mode "${mode}", falling back to raw`);
   const allTabs = await chrome.tabs.query({});
 
   function pickTab(targetId) {
@@ -415,12 +481,13 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId }) {
   Object.assign(chainState, {
     active: true,
     llmA, llmB,
-    mode: mode || "raw",
+    mode: modeId,
     maxRounds: rounds,
     tabA: aTab.id,
     tabB: bTab.id,
     sourceWindowId: aTab.windowId,
     lastProgressAt: Date.now(),
+    startedAt: new Date().toISOString().replace("T", " ").slice(0, 16),
   });
 
   await injectContentScript(chainState.tabA);
@@ -504,6 +571,11 @@ async function startBackgroundPolling() {
       await notifyTab(chainState.tabB, `⚠️ Ping Pong stopped — nothing changed for ${mins} minutes`);
       return;
     }
+
+    // Re-assert the HUD periodically. These sites re-render aggressively and can
+    // tear our bar out of the DOM mid-round, when no state change is due to push
+    // it back. Ten seconds of absence is cheap; a whole round is annoying.
+    if (pollCount % 10 === 0) pushHud();
 
     await pollTab(chainState.tabA, pollCount);
     await pollTab(chainState.tabB, pollCount);
@@ -707,6 +779,9 @@ async function handleResponseComplete(senderTabId) {
   }
 
   chainState.consecutiveSkips = 0;
+  // Recorded before the round-limit check, so the final response of a session is
+  // in the transcript even though it is never bounced anywhere.
+  appendTranscript(senderTargetId, cleanedText);
 
   // Round accounting: currentRound counts bounces delivered. Checking before the
   // bounce is what makes maxRounds=1 deliver exactly one bounce; the old code

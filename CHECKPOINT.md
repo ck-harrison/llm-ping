@@ -3,10 +3,10 @@
 State of the world. Read this first; update it before the session ends.
 
 **Last updated:** 2026-08-10
-**Version:** 3.3.0 (was 3.2.0)
+**Version:** 3.4.0 (3.2.0 → 3.3.0 review fixes → 3.4.0 features)
 **Modes:** BUILD
-**Git:** `main` pushed to origin at `8a7977a`. A second review pass since then is
-**uncommitted** — see "Second review pass" below.
+**Git:** `main` pushed to origin through the v3.3.0 review fixes (`2811477`). The
+v3.4.0 features below are **uncommitted** at the time of writing.
 
 ---
 
@@ -95,6 +95,29 @@ session's reason survives a worker restart so the popup can explain itself, and
 broadcast no longer sleeps after its last target.
 
 Gate is now 11 checks, all 13 canaries fire.
+
+## v3.4.0 — three features (2026-08-10)
+
+1. **Ping Pong mode selector.** The Critique / Improve / Compare / Expand wrappers
+   existed but were reachable only from the context menu; Ping Pong hardwired
+   `raw`. `MODES` moved to `shared.js`, so the context menu and the new popup
+   dropdown build from one object — stronger than checking two copies agree. The
+   gate now forbids a second `MODES` declaration and asserts every wrapper carries
+   `{TEXT}` (without it the instruction is sent and the captured response is
+   silently dropped).
+2. **In-page HUD.** Round counter, Stop, and Copy transcript on both chain tabs,
+   pushed on every state change. The popup closes the moment you click into the tab
+   you are watching, so it could not be the only control surface.
+3. **Copy transcript.** Every genuine response is recorded — appended *before* the
+   round-limit check so the final response is included even though it is never
+   bounced — and formatted as Markdown by a pure `formatTranscript`. Available from
+   the popup and the HUD, mid-session or after.
+
+Two honesty details worth keeping: the transcript states that the opening prompt
+was never captured (nothing reads the composer), and the ~2 MB cap records itself
+in the output as INCOMPLETE rather than quietly dropping the tail.
+
+Gate is now 12 checks with 15 canaries; 29 unit tests.
 
 ## Verified
 

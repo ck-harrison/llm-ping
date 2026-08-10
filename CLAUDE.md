@@ -6,13 +6,15 @@ Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude
 
 ```
 manifest.json   → Manifest V3 config, permissions, content script registration
-shared.js       → Pure helpers: text cleaning, poll state machine, round accounting.
-                  No chrome.* APIs, no DOM, no Date.now(). Loaded three ways:
-                  importScripts in the worker, first in content_scripts, require() in tests.
+shared.js       → Pure helpers: text cleaning, MODES, poll state machine, round
+                  accounting, transcript formatting. No chrome.* APIs, no DOM, no
+                  Date.now(). Loaded four ways: importScripts in the worker, first in
+                  content_scripts, a script tag in popup.html, require() in tests.
 background.js   → Service worker: context menus, tab routing, Ping Pong orchestration, polling
 content.js      → Content script: text injection, response reading, hotkeys, image fallback
 popup.html/js   → Popup UI: Ping Pong controls, hotkey settings, broadcast config
-toast.css       → In-page notification styling (the only toast style in the project)
+toast.css       → In-page styling: the toast (bottom right) and the Ping Pong HUD
+                  (bottom left). The only place raw colour values are allowed
 LICENSE         → MIT. Ships inside the store zip, as MIT requires of distributed copies
 scripts/gate.js → Quality gate. Prints denominators and what each check does not prove
 scripts/canary.sh  → Plants each gate check's own violation and asserts it goes red
@@ -68,6 +70,12 @@ Lives in `shared.js` as `advancePollPhase(state, obs, now, cfg)` — pure, so `t
 
 **Tab identity:** the chain pins `tabA`/`tabB` ids at start and every bounce and every sender lookup uses those ids. Never re-resolve a chain tab by host-substring match — with two tabs of the same site open, the chain injected into one and polled the other.
 
+**Modes:** `MODES` lives in `shared.js` only. The context menu and the Ping Pong dropdown both build from it, so they cannot offer different sets — that is why there is no parity check between them, and why the gate instead forbids a second `MODES` declaration. Every non-raw wrapper must contain `{TEXT}`; without it the instruction is sent and the captured response is silently dropped.
+
+**In-page HUD:** `pushHud()` sends round counter, Stop, and Copy transcript to both chain tabs on every state change. The popup closes the moment you click into the tab you are watching, so it cannot be the only control surface for a running session.
+
+**Transcript:** every genuine response is appended to `chainState.transcript` *before* the round-limit check, so the final response of a session is included even though it is never bounced. Served by the `getTranscript` message to both the popup and the HUD.
+
 ## Defensive Checks
 
 - **Duplicate:** `cleanText(text) === lastBouncedText` → skip, reset the tab to idle
@@ -94,7 +102,8 @@ Hotkeys are implemented as a content-script keydown listener rather than `chrome
 2. Mid-response pauses > 4s (thinking, web search) may trigger a premature bounce.
 3. A reply shorter than 20 characters never satisfies the completion gate; the watchdog ends the session. Pinned in the tests as a known limitation.
 4. All LLM selectors can break when platforms update their UI. Nothing mechanical can catch this — it needs a human on the live sites.
-5. Ping Pong always uses `raw` mode; the MODES wrappers are reachable only from the context menu. There is no Ping Pong mode selector in the popup.
+5. The transcript starts at the first AI response — the opening prompt you type is never captured, because nothing reads the composer. `formatTranscript` says so in the output rather than letting it read as the whole conversation.
+6. A session over ~2 MB of captured text stops recording the transcript. The cap is recorded and reported in the output, not silently applied.
 
 ## Coding Conventions
 
@@ -117,7 +126,7 @@ None of `docs/`, this file, or `README.md` ships in the store package — `scrip
 
 ## Quality gate
 
-`node scripts/gate.js` — 11 mechanical checks. Every check prints its denominator (how many files, lines, or ids it examined) and states what it does not prove. Exit code is the result; do not report done on a red gate.
+`node scripts/gate.js` — 12 mechanical checks. Every check prints its denominator (how many files, lines, or ids it examined) and states what it does not prove. Exit code is the result; do not report done on a red gate.
 
 1. **Syntax** — `node -c` on all four JS files
 2. **Unit tests** — `node --test`; an empty suite is treated as a failure, not a pass
@@ -126,14 +135,17 @@ None of `docs/`, this file, or `README.md` ships in the store package — `scrip
 5. **No raw hex** outside popup.html and toast.css, whose domain is styling
 6. **Target registry parity** — five targets across five registries, including default hotkey *values*, not just keys
 7. **Script load order** — shared.js is evaluated before its consumers in all four load paths (content_scripts, importScripts, every executeScript injection, popup.html). Get this wrong and `cleanText` is undefined inside a callback: a runtime error no other check can see
-8. **Host surface parity** — host_permissions, content_scripts, MENU_URL_PATTERNS, TARGETS
-9. **No silently swallowed errors** — empty catch blocks, `|| true`, suppressed diagnostics
-10. **Docs coverage** — both directions: undocumented shipping files, and doc references that no longer exist
-11. **Package allowlist** — every shipping file named, no internal path listed
+8. **Mode registry single source** — MODES only in shared.js, no second copy, every wrapper carries `{TEXT}`
+9. **Host surface parity** — host_permissions, content_scripts, MENU_URL_PATTERNS, TARGETS
+10. **No silently swallowed errors** — empty catch blocks, `|| true`, suppressed diagnostics
+11. **Docs coverage** — both directions: undocumented shipping files, and doc references that no longer exist
+12. **Package allowlist** — every shipping file named, no internal path listed
 
 Report each check explicitly. "All good" is not a gate result.
 
 **Canary any check you add or edit**, in both directions: run it clean and watch it pass, then plant exactly the violation it claims to catch and watch it fail with the expected message. A check nobody has seen fail is not evidence.
+
+**Never pin a canary's plant to a value that changes.** The Version sync plant was written as `s/^3\.3\.0$/9.9.9/`, so the first version bump made it a no-op — it planted nothing, the check stayed green, and `scripts/canary.sh` read that as the check passing its own test. Plants match patterns (`^\d+\.\d+\.\d+$`), not literals. `scripts/canary.sh` catches this class itself by treating a check that stays green as a failure, which is how this one surfaced.
 
 **What the gate cannot check, and a human must:** injection and capture against the five live sites, a real Ping Pong session end to end including a deliberate stall, and whether the popup still looks right.
 

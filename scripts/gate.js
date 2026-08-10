@@ -291,6 +291,34 @@ check("Script load order", () => {
   };
 });
 
+// ── 6c. mode registry is single-source ─────────────────────────────────────
+// MODES lives in shared.js only. Both the context menu and the Ping Pong dropdown
+// build from it, which is stronger than checking two copies agree — but only for
+// as long as nobody reintroduces a second copy.
+check("Mode registry single source", () => {
+  const shared = read("shared.js");
+  const modes = extractBlockKeys(shared, "var MODES = {");
+  const problems = [];
+
+  if (!modes) return { ok: false, detail: "MODES not found in shared.js", notProven: "anything" };
+  if (!modes.includes("raw")) problems.push("MODES has no raw entry");
+  if (/^\s*(const|var|let)\s+MODES\s*=/m.test(read("background.js"))) problems.push("background.js declares its own MODES");
+  if (/^\s*(const|var|let)\s+MODES\s*=/m.test(read("popup.js"))) problems.push("popup.js declares its own MODES");
+  if (!read("popup.js").includes("Object.entries(MODES)")) problems.push("popup.js does not build its mode dropdown from MODES");
+
+  // A wrapper without {TEXT} sends the instruction and silently drops the
+  // captured response. The unit tests assert this too; here it is cheap.
+  const wrappers = [...shared.matchAll(/wrapper:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+  const bad = wrappers.filter((w) => !w.includes("{TEXT}"));
+  if (bad.length) problems.push(`${bad.length} wrapper(s) missing the {TEXT} placeholder`);
+
+  return {
+    ok: problems.length === 0,
+    detail: `${modes.length} modes, ${wrappers.length} wrappers, 4 duplication rules checked, ${problems.length} problems${problems.length ? " — " + problems.join("; ") : ""}`,
+    notProven: "that the wrapper wording actually produces a useful prompt",
+  };
+});
+
 // ── 7. host surface parity ─────────────────────────────────────────────────
 
 check("Host surface parity", () => {

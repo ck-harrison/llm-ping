@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.3.0 ──
+// ── LLM PingIt – Shared pure helpers v3.4.0 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -62,6 +62,57 @@
   function applyWrapper(wrapper, text) {
     if (!wrapper) return text;
     return wrapper.replace("{TEXT}", function () { return text; });
+  }
+
+  // ── Modes ────────────────────────────────────────────────────────────────
+  // Single source of truth for the wrappers. These used to live only in
+  // background.js, so the popup had no way to offer them and Ping Pong was
+  // hardwired to raw. Both the context menu and the Ping Pong dropdown now build
+  // from this object, which is why no parity check is needed between them.
+  var MODES = {
+    raw:      { label: "Send as-is",       wrapper: null },
+    critique: { label: "Ask to critique",  wrapper: "Here is a response from another AI model. Please critique it — identify weaknesses, missing nuance, or errors, and suggest improvements:\n\n---\n{TEXT}\n---" },
+    improve:  { label: "Ask to improve",   wrapper: "Here is a response from another AI model. Please rewrite and improve it, keeping the same intent but making it stronger, clearer, and more accurate:\n\n---\n{TEXT}\n---" },
+    compare:  { label: "Ask to compare",   wrapper: "Here is a response from another AI model to a user's question. Please provide your own independent answer to the same question, then compare your answer with the one below, noting where you agree and disagree:\n\n---\n{TEXT}\n---" },
+    expand:   { label: "Ask to expand",    wrapper: "Here is a response from another AI model. Please expand on it — add depth, examples, and anything important that was missed:\n\n---\n{TEXT}\n---" },
+  };
+
+  // ── Transcript formatting ────────────────────────────────────────────────
+  // Pure so it can be tested. `startedAt` arrives pre-formatted: keeping Date out
+  // of this file is what lets every helper here be deterministic.
+  function formatTranscript(meta, entries) {
+    meta = meta || {};
+    entries = entries || [];
+    var lines = [];
+    lines.push("# LLM PingIt — " + (meta.labelA || "?") + " ↔ " + (meta.labelB || "?"));
+
+    var bits = [];
+    var rounds = meta.rounds || 0;
+    bits.push(rounds + (rounds === 1 ? " round" : " rounds"));
+    if (meta.modeLabel) bits.push("mode: " + meta.modeLabel);
+    if (meta.startedAt) bits.push(meta.startedAt);
+    lines.push(bits.join(" · "));
+    lines.push("");
+
+    // Say what is missing rather than letting the transcript imply it is whole.
+    lines.push("The opening prompt you typed is not captured — this transcript starts with the first AI response.");
+    if (meta.truncated) {
+      lines.push("INCOMPLETE: this session passed the transcript size limit, so responses after the ones below were not recorded.");
+    }
+    lines.push("");
+
+    if (entries.length === 0) {
+      lines.push("(No responses were captured.)");
+    } else {
+      for (var i = 0; i < entries.length; i++) {
+        lines.push("## " + entries[i].seq + " · " + (entries[i].label || entries[i].targetId || "?"));
+        lines.push("");
+        lines.push(entries[i].text || "");
+        lines.push("");
+      }
+    }
+
+    return lines.join("\n").trim() + "\n";
   }
 
   // ── Ping Pong poll state machine ─────────────────────────────────────────
@@ -169,7 +220,14 @@
     return currentRound < maxRounds;
   }
 
+  // One definition of the range. The popup and the background both clamp, and two
+  // copies of the bounds would let them disagree silently — the popup accepting a
+  // number the background quietly changes.
+  var ROUND_LIMITS = { MIN: 1, MAX: 50 };
+
   function clampRounds(value, min, max) {
+    if (min === undefined) min = ROUND_LIMITS.MIN;
+    if (max === undefined) max = ROUND_LIMITS.MAX;
     var n = parseInt(value, 10);
     if (!Number.isFinite(n)) return min;
     return Math.min(max, Math.max(min, n));
@@ -178,10 +236,13 @@
   return {
     cleanText: cleanText,
     applyWrapper: applyWrapper,
+    MODES: MODES,
+    formatTranscript: formatTranscript,
     advancePollPhase: advancePollPhase,
     newPollState: newPollState,
     shouldBounce: shouldBounce,
     clampRounds: clampRounds,
+    ROUND_LIMITS: ROUND_LIMITS,
     POLL_DEFAULTS: POLL_DEFAULTS,
   };
 });

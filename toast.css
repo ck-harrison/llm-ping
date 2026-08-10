@@ -21,3 +21,64 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Ping Pong HUD — bottom left, so it never sits on top of the toast (bottom
+   right) or the composer. */
+#llm-pingit-hud {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 8px 10px 8px 14px;
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  z-index: 999999;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#llm-pingit-hud.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#llm-pingit-hud .pingit-hud-text {
+  white-space: nowrap;
+}
+
+#llm-pingit-hud .pingit-hud-btn {
+  background: #2a2a3e;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+#llm-pingit-hud .pingit-hud-btn:hover {
+  background: #6C5CE7;
+  border-color: #6C5CE7;
+  color: #fff;
+}
+
+#llm-pingit-hud .pingit-hud-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#llm-pingit-hud .pingit-hud-close {
+  padding: 4px 8px;
+  font-size: 14px;
+}

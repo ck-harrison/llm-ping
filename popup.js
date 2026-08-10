@@ -1,4 +1,4 @@
-// ── LLM PingIt – Popup v3.3.0 ──
+// ── LLM PingIt – Popup v3.4.0 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {
@@ -19,8 +19,8 @@ const DEFAULT_HOTKEYS = {
   broadcast: { ctrl: true, shift: true, alt: false, key: "0" },
 };
 
-const MIN_ROUNDS = 1;
-const MAX_ROUNDS = 50;
+const MIN_ROUNDS = ROUND_LIMITS.MIN;
+const MAX_ROUNDS = ROUND_LIMITS.MAX;
 
 // ══════════════════════════════════════════════════
 //  HOTKEY SETTINGS
@@ -172,9 +172,11 @@ chrome.storage.sync.get({ broadcast: defaultBroadcast }, (data) => {
 
 const chainA = document.getElementById("chainA");
 const chainB = document.getElementById("chainB");
+const chainMode = document.getElementById("chainMode");
 const chainRounds = document.getElementById("chainRounds");
 const btnStart = document.getElementById("btnStart");
 const btnStop = document.getElementById("btnStop");
+const btnCopyTranscript = document.getElementById("btnCopyTranscript");
 const chainStatus = document.getElementById("chainStatus");
 
 for (const [id, target] of Object.entries(TARGETS)) {
@@ -184,14 +186,44 @@ for (const [id, target] of Object.entries(TARGETS)) {
   chainB.appendChild(optB);
 }
 
-chrome.storage.sync.get({ chainA: "chatgpt", chainB: "claude", chainRounds: 5 }, (data) => {
+// Built from MODES in shared.js — the same object background.js builds its context
+// menu from, so the two cannot offer different sets.
+for (const [id, mode] of Object.entries(MODES)) {
+  const opt = document.createElement("option");
+  opt.value = id;
+  // "Ask to critique" → "Critique": the dropdown is 100px wide and the verb is
+  // the only part that distinguishes the options.
+  opt.textContent = id === "raw"
+    ? "Pass through"
+    : mode.label.replace(/^Ask to /, "").replace(/^./, (c) => c.toUpperCase());
+  chainMode.appendChild(opt);
+}
+
+// Derive the input's own bounds from the shared limits, so the HTML attributes
+// cannot drift from what the code actually enforces.
+chainRounds.min = String(MIN_ROUNDS);
+chainRounds.max = String(MAX_ROUNDS);
+
+chrome.storage.sync.get({ chainA: "chatgpt", chainB: "claude", chainMode: "raw", chainRounds: 5 }, (data) => {
   chainA.value = data.chainA;
   chainB.value = data.chainB;
+  chainMode.value = MODES[data.chainMode] ? data.chainMode : "raw";
   chainRounds.value = clampRounds(data.chainRounds, MIN_ROUNDS, MAX_ROUNDS);
 });
 
 chainA.addEventListener("change", () => chrome.storage.sync.set({ chainA: chainA.value }));
 chainB.addEventListener("change", () => chrome.storage.sync.set({ chainB: chainB.value }));
+chainMode.addEventListener("change", () => chrome.storage.sync.set({ chainMode: chainMode.value }));
+
+btnCopyTranscript.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ action: "getTranscript" }, (res) => {
+    void chrome.runtime.lastError;
+    if (!res || !res.text) { setStatus("⚠️ No transcript recorded yet"); return; }
+    navigator.clipboard.writeText(res.text)
+      .then(() => setStatus(`📋 Copied ${res.entries} responses${res.truncated ? " (incomplete)" : ""}`))
+      .catch(() => setStatus("⚠️ Could not copy to the clipboard"));
+  });
+});
 
 // min/max on a number input is UI-only — typing past it is accepted. Clamp for real.
 chainRounds.addEventListener("change", () => {
@@ -216,7 +248,7 @@ btnStart.addEventListener("click", () => {
       action: "startChain",
       llmA: chainA.value,
       llmB: chainB.value,
-      mode: "raw",
+      mode: chainMode.value,
       maxRounds: rounds,
       windowId: win.id,
     }, (response) => {
@@ -245,7 +277,8 @@ btnStop.addEventListener("click", () => {
 chrome.runtime.sendMessage({ action: "getChainState" }, (response) => {
   void chrome.runtime.lastError;   // read it so Chrome does not log it as unchecked
   if (!response) return;
-  updateUI(response.active, response.currentRound, response.maxRounds);
+  if (response.mode && MODES[response.mode]) chainMode.value = response.mode;
+  updateUI(response.active, response.currentRound, response.maxRounds, response.transcriptEntries);
   if (!response.active && response.lastError) setStatus("⚠️ " + response.lastError);
   else if (!response.active && response.stoppedReason && response.currentRound > 0) {
     setStatus(`✓ ${response.currentRound} rounds — ${response.stoppedReason}`);
@@ -254,7 +287,7 @@ chrome.runtime.sendMessage({ action: "getChainState" }, (response) => {
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === "chainStateUpdate") {
-    updateUI(msg.state.active, msg.state.currentRound, msg.state.maxRounds);
+    updateUI(msg.state.active, msg.state.currentRound, msg.state.maxRounds, msg.state.transcriptEntries);
     if (!msg.state.active && msg.state.stoppedReason) {
       setStatus(`${msg.state.currentRound} rounds — ${msg.state.stoppedReason}`);
     }
@@ -266,12 +299,22 @@ function setStatus(text, active) {
   chainStatus.className = active ? "chain-status active" : "chain-status";
 }
 
-function updateUI(active, currentRound = 0, maxRounds = 5) {
+let lastTranscriptEntries = 0;
+
+function updateUI(active, currentRound = 0, maxRounds = 5, transcriptEntries) {
   btnStart.style.display = active ? "none" : "block";
   btnStop.style.display = active ? "block" : "none";
   chainA.disabled = active;
   chainB.disabled = active;
+  chainMode.disabled = active;
   chainRounds.disabled = active;
+
+  // Remembered rather than defaulted to 0, so pressing Stop — which calls this
+  // with no count — does not hide the button at the exact moment you want it.
+  if (typeof transcriptEntries === "number") lastTranscriptEntries = transcriptEntries;
+  // Available mid-session too: no need to wait for the end to grab what has
+  // happened so far.
+  btnCopyTranscript.style.display = lastTranscriptEntries > 0 ? "block" : "none";
 
   if (active) {
     setStatus(`🏓 Ping Pong — round ${currentRound}/${maxRounds}`, true);

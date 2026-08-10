@@ -1,4 +1,4 @@
-// ── LLM PingIt – Content Script v3.3.0 ──
+// ── LLM PingIt – Content Script v3.4.0 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //
@@ -140,7 +140,110 @@
       sendResponse({ ok: true });
       return false;
     }
+
+    if (msg.action === "hud") {
+      renderHud(msg.state);
+      sendResponse({ ok: true });
+      return false;
+    }
   });
+
+  // ══════════════════════════════════════════════════
+  //  PING PONG HUD
+  //  A round counter, a Stop button and Copy transcript, in the page. The popup
+  //  closes the moment you click into the tab you are watching, so it is the
+  //  wrong place to control a running session from.
+  // ══════════════════════════════════════════════════
+
+  var hud = null;
+  var hudText = null;
+  var hudStop = null;
+  var hudCopy = null;
+  var hudHideTimer = null;
+
+  function buildHud() {
+    var el = document.createElement("div");
+    el.id = "llm-pingit-hud";
+
+    hudText = document.createElement("span");
+    hudText.className = "pingit-hud-text";
+
+    hudStop = document.createElement("button");
+    hudStop.className = "pingit-hud-btn";
+    hudStop.textContent = "Stop";
+    hudStop.addEventListener("click", function () {
+      hudStop.disabled = true;
+      chrome.runtime.sendMessage({ action: "stopChain" }, function () {
+        void chrome.runtime.lastError;
+      });
+    });
+
+    hudCopy = document.createElement("button");
+    hudCopy.className = "pingit-hud-btn";
+    hudCopy.textContent = "Copy transcript";
+    hudCopy.addEventListener("click", copyTranscript);
+
+    var close = document.createElement("button");
+    close.className = "pingit-hud-btn pingit-hud-close";
+    close.textContent = "×";
+    close.title = "Hide";
+    close.addEventListener("click", removeHud);
+
+    el.appendChild(hudText);
+    el.appendChild(hudStop);
+    el.appendChild(hudCopy);
+    el.appendChild(close);
+    document.body.appendChild(el);
+    // Next frame, or the browser has nothing to transition from and the bar can
+    // sit at opacity 0. Same reason the toast does it.
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    return el;
+  }
+
+  function removeHud() {
+    if (hudHideTimer) { clearTimeout(hudHideTimer); hudHideTimer = null; }
+    if (hud) { hud.remove(); hud = null; }
+  }
+
+  function renderHud(state) {
+    if (!state || (!state.active && !state.reason)) { removeHud(); return; }
+
+    // The element can be torn out by the site's own re-rendering, so re-attach
+    // rather than assuming our reference is still in the document.
+    if (!hud || !document.body.contains(hud)) hud = buildHud();
+    if (hudHideTimer) { clearTimeout(hudHideTimer); hudHideTimer = null; }
+
+    var pair = (state.labelA && state.labelB) ? state.labelA + " ↔ " + state.labelB : "";
+    if (state.active) {
+      hudText.textContent = "🏓 Round " + state.round + "/" + state.max + (pair ? " · " + pair : "");
+      hudStop.style.display = "";
+      hudStop.disabled = false;
+    } else {
+      hudText.textContent = "🏓 Stopped — " + state.reason;
+      hudStop.style.display = "none";
+      // Leave the ended state up long enough to read and copy from, then get out
+      // of the way rather than living on the page forever.
+      hudHideTimer = setTimeout(removeHud, 90000);
+    }
+    hudCopy.style.display = state.hasTranscript ? "" : "none";
+    hud.classList.add("show");
+  }
+
+  function copyTranscript() {
+    chrome.runtime.sendMessage({ action: "getTranscript" }, function (res) {
+      void chrome.runtime.lastError;
+      if (!res || !res.text) {
+        showToast("⚠️ No transcript recorded yet");
+        return;
+      }
+      navigator.clipboard.writeText(res.text).then(function () {
+        showToast("📋 Transcript copied — " + res.entries + " responses" + (res.truncated ? " (incomplete)" : ""));
+      }).catch(function (e) {
+        console.log("[LLM PingIt] Clipboard write failed:", e && e.message);
+        showToast("⚠️ Could not copy — try the Copy transcript button in the popup");
+      });
+    });
+  }
 
   // ══════════════════════════════════════════════════
   //  DOM READING

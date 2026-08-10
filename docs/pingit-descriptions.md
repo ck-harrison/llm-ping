@@ -24,7 +24,8 @@ Right-click bounce — PingIt any response to another AI instantly.
 Highlight bounce — Select specific text, PingIt just that part.
 Modify mode — Add instructions: Critique, Improve, Compare, or Expand.
 Broadcast — Send to all AIs simultaneously.
-Ping Pong — Start an autonomous conversation between two AIs. Watch them debate, iterate on code, or refine ideas without lifting a finger.
+Ping Pong — Start an autonomous conversation between two AIs. Watch them debate, iterate on code, or refine ideas without lifting a finger. Choose how each round is framed: pass through, critique, improve, compare, or expand.
+Copy transcript — Take the whole exchange out as Markdown, during a session or after it.
 Hotkeys — Ctrl+Shift+1 through 5 for each AI. Fully customizable.
 
 HOW IT WORKS
