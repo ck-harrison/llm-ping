@@ -197,10 +197,18 @@
   // in a WeakMap — this used to run on every bubble, once a second, per tab.
   var grokRoleCache = new WeakMap();
 
-  function isGrokUserBubble(el) {
+  // `fresh` skips the cache. React can reuse a DOM node for a different message,
+  // which would leave a cached role stale — and a stale "user" verdict on the
+  // element we are about to capture means bouncing the wrong text. So the counting
+  // pass trusts the cache (a miscount is absorbed by the state machine's inner
+  // gate) and the capture pass re-checks, which costs one getComputedStyle rather
+  // than one per bubble.
+  function isGrokUserBubble(el, fresh) {
     if (!IS_GROK) return false;
-    var cached = grokRoleCache.get(el);
-    if (cached !== undefined) return cached;
+    if (!fresh) {
+      var cached = grokRoleCache.get(el);
+      if (cached !== undefined) return cached;
+    }
     var isUser = false;
     try {
       isUser = el.parentElement &&
@@ -246,7 +254,7 @@
       if (lastText === null) {
         for (var k = els.length - 1; k >= 0; k--) {
           var el = els[k];
-          if (isGrokUserBubble(el)) continue;
+          if (isGrokUserBubble(el, true)) continue;
           if ((el.textContent || "").trim().length <= 10) continue;
           var text = (el.innerText || el.textContent || "").trim();
           if (text.length <= 10) continue;
@@ -272,7 +280,7 @@
       try {
         var els = document.querySelectorAll(selectors[i]);
         for (var j = els.length - 1; j >= 0; j--) {
-          if (isGrokUserBubble(els[j])) continue;
+          if (isGrokUserBubble(els[j], true)) continue;
           var imgs = els[j].querySelectorAll("img");
           for (var k = 0; k < imgs.length; k++) {
             var alt = (imgs[k].alt || "").trim();
@@ -356,13 +364,13 @@
     return fn().then(function () {
       if (!autoSubmit) {
         showToast("✅ Message loaded — review and press Enter to send");
-        return { ok: true, submitted: false, autoSubmit: false };
+        return { ok: true, clicked: false, submitted: false, autoSubmit: false };
       }
       return sleep(300)
         .then(function () { return clickSendButton(target); })
-        .then(function (sent) {
-          showToast(sent ? "✅ PingIt sent!" : "✅ Message loaded — press Enter");
-          return { ok: true, submitted: !!sent, autoSubmit: true };
+        .then(function (result) {
+          showToast(result.clicked ? "✅ PingIt sent!" : "✅ Message loaded — press Enter");
+          return { ok: true, clicked: result.clicked, submitted: result.submitted, autoSubmit: true };
         });
     }).catch(function (err) {
       // Report the failure instead of swallowing it. This used to resolve
@@ -378,6 +386,46 @@
         return { ok: false, reason: "inject-and-clipboard-failed", error: err && err.message };
       });
     });
+  }
+
+  // Where the composer lives per site, so we can tell "we clicked something" from
+  // "the message actually went". Mirrors the injection targets.
+  var COMPOSER_SELECTORS = {
+    claude: ['[contenteditable="true"].ProseMirror', '[contenteditable="true"]'],
+    chatgpt: ["#prompt-textarea", '[contenteditable="true"]'],
+    gemini: ['.ql-editor[contenteditable="true"]', '[contenteditable="true"]'],
+    copilot: ["textarea", '[contenteditable="true"]'],
+    grok: ["textarea"],
+  };
+
+  function getComposer(target) {
+    var sels = COMPOSER_SELECTORS[target] || ["textarea", '[contenteditable="true"]'];
+    for (var i = 0; i < sels.length; i++) {
+      var el = document.querySelector(sels[i]);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function composerText(el) {
+    if (!el) return "";
+    var raw = (el.value !== undefined && el.value !== null) ? el.value : (el.innerText || "");
+    return raw.trim();
+  }
+
+  // All five sites clear the composer when a message is accepted, so an emptied
+  // composer is observable evidence that the send landed. A click is not: the
+  // button may be a no-op, and the Enter-key fallback below returns having only
+  // dispatched a keydown.
+  function waitForComposerToClear(el, before, timeout) {
+    var deadline = Date.now() + timeout;
+    function poll() {
+      var now = composerText(el);
+      if (now === "" || now !== before) return Promise.resolve(true);
+      if (Date.now() >= deadline) return Promise.resolve(false);
+      return sleep(150).then(poll);
+    }
+    return poll();
   }
 
   function clickSendButton(target) {
@@ -402,13 +450,16 @@
       return false;
     }
 
+    var composer = getComposer(target);
+    var before = composerText(composer);
+
     // Retry ladder: these buttons enable a beat after the input event lands.
     var delays = [0, 300, 500, 500];
     function attempt(i) {
       if (tryClick()) return Promise.resolve(true);
       if (i >= delays.length - 1) {
         try {
-          var input = document.querySelector('[contenteditable="true"]') || document.querySelector("textarea");
+          var input = composer || document.querySelector('[contenteditable="true"]') || document.querySelector("textarea");
           if (input) {
             input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
             return Promise.resolve(true);
@@ -420,7 +471,20 @@
       }
       return sleep(delays[i + 1]).then(function () { return attempt(i + 1); });
     }
-    return attempt(0);
+
+    return attempt(0).then(function (clicked) {
+      if (!clicked) return { clicked: false, submitted: false };
+      // Two separate claims, reported separately. `clicked` is what we did;
+      // `submitted` is what we can observe. The caller treats an unverified send
+      // as a warning rather than a failure, because a site that clears its
+      // composer late would otherwise kill a session that is working fine.
+      return waitForComposerToClear(composer, before, 1500).then(function (cleared) {
+        if (!cleared) {
+          console.log("[LLM PingIt] Send button clicked but the composer still holds the text — send is unverified");
+        }
+        return { clicked: true, submitted: cleared };
+      });
+    });
   }
 
   function injectClaude(text) {

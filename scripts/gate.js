@@ -214,6 +214,29 @@ check("Target registry parity", () => {
   const hkExpected = [...bg, "broadcast"];
   if (!same(contentHotkeys, hkExpected)) problems.push(`content DEFAULT_HOTKEYS [${contentHotkeys}] vs expected [${hkExpected}]`);
   if (!same(popupHotkeys, hkExpected)) problems.push(`popup DEFAULT_HOTKEYS [${popupHotkeys}] vs expected [${hkExpected}]`);
+
+  // Matching key sets is not matching defaults. Ctrl+Shift+1 in one file and
+  // Ctrl+Shift+9 in the other passes a keys-only check while the popup shows a
+  // binding that does not fire — so compare the values too.
+  const bindings = (src, decl) => {
+    const start = src.indexOf(decl);
+    const body = src.slice(start, src.indexOf("};", start));
+    const out = {};
+    for (const m of body.matchAll(/(\w+):\s*\{([^}]*)\}/g)) {
+      const flags = m[2];
+      const flag = (name) => new RegExp(`${name}:\\s*true`).test(flags);
+      const key = (flags.match(/key:\s*"([^"]*)"/) || [])[1];
+      out[m[1]] = `${flag("ctrl") ? "c" : ""}${flag("alt") ? "a" : ""}${flag("shift") ? "s" : ""}+${key}`;
+    }
+    return out;
+  };
+  const contentBindings = bindings(read("content.js"), "var DEFAULT_HOTKEYS = {");
+  const popupBindings = bindings(read("popup.js"), "const DEFAULT_HOTKEYS = {");
+  for (const id of Object.keys(contentBindings)) {
+    if (contentBindings[id] !== popupBindings[id]) {
+      problems.push(`default hotkey for ${id} differs: content.js "${contentBindings[id]}" vs popup.js "${popupBindings[id]}"`);
+    }
+  }
   if (selectors.length !== bg.length) problems.push(`${bg.length} targets but ${selectors.length} MESSAGE_SELECTORS domains`);
   for (const m of bgMatches) {
     if (!selectors.some((d) => d === m || d.includes(m) || m.includes(d))) {
@@ -225,6 +248,46 @@ check("Target registry parity", () => {
     ok: problems.length === 0,
     detail: `${bg.length} targets × 5 registries checked, ${problems.length} problems${problems.length ? " — " + problems.join("; ") : ""}`,
     notProven: "that the selectors still match the live sites — only that an entry exists",
+  };
+});
+
+// ── 6b. script load order ──────────────────────────────────────────────────
+// shared.js must be evaluated before its consumers everywhere. Get this wrong and
+// cleanText / clampRounds are undefined at the point of use — which is a runtime
+// ReferenceError inside a callback, not a parse error, so every other check in
+// this gate stays green while the extension is broken.
+check("Script load order", () => {
+  const manifest = JSON.parse(read("manifest.json"));
+  const problems = [];
+
+  const csJs = manifest.content_scripts[0].js;
+  if (csJs[0] !== "shared.js") problems.push(`content_scripts.js starts with "${csJs[0]}", must be "shared.js"`);
+  if (csJs.indexOf("content.js") <= csJs.indexOf("shared.js") && csJs.indexOf("content.js") !== -1) {
+    if (csJs.indexOf("content.js") < csJs.indexOf("shared.js")) problems.push("content.js is listed before shared.js");
+  }
+
+  const bg = read("background.js");
+  if (!/importScripts\(\s*["']shared\.js["']\s*\)/.test(bg)) problems.push("background.js does not importScripts shared.js");
+
+  // Every on-demand injection must carry shared.js too, in front of content.js.
+  const injections = [...bg.matchAll(/files:\s*\[([^\]]+)\]/g)].map((m) => m[1]);
+  const scriptInjections = injections.filter((f) => f.includes("content.js"));
+  if (scriptInjections.length === 0) problems.push("no executeScript call injects content.js — the extractor needs updating");
+  for (const files of scriptInjections) {
+    if (!files.includes("shared.js")) problems.push(`an executeScript injects content.js without shared.js: [${files}]`);
+    else if (files.indexOf("shared.js") > files.indexOf("content.js")) problems.push(`an executeScript injects content.js before shared.js: [${files}]`);
+  }
+
+  const html = read("popup.html");
+  const sharedAt = html.indexOf('src="shared.js"');
+  const popupAt = html.indexOf('src="popup.js"');
+  if (sharedAt === -1) problems.push("popup.html does not load shared.js");
+  else if (popupAt !== -1 && sharedAt > popupAt) problems.push("popup.html loads popup.js before shared.js");
+
+  return {
+    ok: problems.length === 0,
+    detail: `4 load paths checked (content_scripts, importScripts, ${scriptInjections.length} executeScript call(s), popup.html), ${problems.length} problems${problems.length ? " — " + problems.join("; ") : ""}`,
+    notProven: "that shared.js actually exports what its consumers call — only that it is evaluated first",
   };
 });
 

@@ -82,6 +82,18 @@ canary "Target registry parity" \
   "a target present in popup.js but not background.js" \
   "perl -0pi -e 's/  grok:    \{ label: \"Grok\" \},/  grok:    { label: \"Grok\" },\n  bogus:   { label: \"Bogus\" },/' popup.js"
 
+canary "Target registry parity" \
+  "a default hotkey whose VALUE differs between content.js and popup.js (keys still match)" \
+  "perl -0pi -e 's/    gemini:    \{ ctrl: true, shift: true, alt: false, key: \"3\" \},/    gemini:    { ctrl: true, shift: true, alt: false, key: \"9\" },/' content.js"
+
+canary "Script load order" \
+  "content.js listed before shared.js in the manifest" \
+  "perl -0pi -e 's/\"js\": \[\"shared.js\", \"content.js\"\]/\"js\": [\"content.js\", \"shared.js\"]/' manifest.json"
+
+canary "Script load order" \
+  "an executeScript that injects content.js without shared.js" \
+  "perl -0pi -e 's/files: \[\"shared.js\", \"content.js\"\]/files: [\"content.js\"]/' background.js"
+
 canary "Host surface parity" \
   "a host_permission that no target and no content script uses" \
   "node -e 'const fs=require(\"fs\");const m=JSON.parse(fs.readFileSync(\"manifest.json\",\"utf8\"));m.host_permissions.push(\"https://example.com/*\");fs.writeFileSync(\"manifest.json\",JSON.stringify(m,null,2));'"

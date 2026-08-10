@@ -73,7 +73,8 @@ Lives in `shared.js` as `advancePollPhase(state, obs, now, cfg)` — pure, so `t
 - **Duplicate:** `cleanText(text) === lastBouncedText` → skip, reset the tab to idle
 - **Self-echo:** `cleanText(text) === cleanText(lastInjectedText)` → skip, reset to idle (Grok "choose preferred response" fix)
 - **Every early return resets the tab to idle.** A tab left in the `complete` phase is never polled again, which is a permanent silent hang.
-- **Injection is verified:** the content script reports `{ok, submitted}` and a failed or unsubmitted bounce **stops the chain with a toast**. It used to fall back to the clipboard and report success, so the chain waited forever for a reply to a message that was never sent.
+- **Injection is verified:** the content script reports `{ok, clicked, submitted}` and a bounce that could not be clicked **stops the chain with a toast**. It used to fall back to the clipboard and report success, so the chain waited forever for a reply to a message that was never sent.
+- **`clicked` and `submitted` are separate claims, deliberately.** `clicked` is what we did; `submitted` means the composer was observed to clear, which is the only evidence available that a send actually landed (a click can be a no-op and the Enter fallback only dispatches a keydown). Only `!clicked` is fatal — treating an unverified send as fatal would kill working sessions on any site that clears its composer slowly, and a real failure is still caught by the watchdog.
 - **Stall watchdog:** 3 minutes with no state change → stop and say so.
 - **Skip limit:** 3 consecutive skips (duplicate, self-echo, nothing usable) → stop with the reason. A skip resets the tab to idle, which emits state-machine events, which refresh the watchdog — so skips need their own bound or a tab serving the same content spins forever with the watchdog never firing.
 - **Poll failures:** logged every time, with a consecutive-failure count; 5 in a row stops the chain. A closed or navigated chain tab stops or re-baselines it.
@@ -116,18 +117,19 @@ None of `docs/`, this file, or `README.md` ships in the store package — `scrip
 
 ## Quality gate
 
-`node scripts/gate.js` — 10 mechanical checks. Every check prints its denominator (how many files, lines, or ids it examined) and states what it does not prove. Exit code is the result; do not report done on a red gate.
+`node scripts/gate.js` — 11 mechanical checks. Every check prints its denominator (how many files, lines, or ids it examined) and states what it does not prove. Exit code is the result; do not report done on a red gate.
 
 1. **Syntax** — `node -c` on all four JS files
 2. **Unit tests** — `node --test`; an empty suite is treated as a failure, not a pass
 3. **Log prefix convention** — every console call carries `[LLM PingIt]`
-4. **Version sync** — manifest vs README vs this file vs four file headers
+4. **Version sync** — manifest vs README vs four file headers
 5. **No raw hex** outside popup.html and toast.css, whose domain is styling
-6. **Target registry parity** — five targets across five registries
-7. **Host surface parity** — host_permissions, content_scripts, MENU_URL_PATTERNS, TARGETS
-8. **No silently swallowed errors** — empty catch blocks, `|| true`, suppressed diagnostics
-9. **Docs coverage** — both directions: undocumented shipping files, and doc references that no longer exist
-10. **Package allowlist** — every shipping file named, no internal path listed
+6. **Target registry parity** — five targets across five registries, including default hotkey *values*, not just keys
+7. **Script load order** — shared.js is evaluated before its consumers in all four load paths (content_scripts, importScripts, every executeScript injection, popup.html). Get this wrong and `cleanText` is undefined inside a callback: a runtime error no other check can see
+8. **Host surface parity** — host_permissions, content_scripts, MENU_URL_PATTERNS, TARGETS
+9. **No silently swallowed errors** — empty catch blocks, `|| true`, suppressed diagnostics
+10. **Docs coverage** — both directions: undocumented shipping files, and doc references that no longer exist
+11. **Package allowlist** — every shipping file named, no internal path listed
 
 Report each check explicitly. "All good" is not a gate result.
 

@@ -221,12 +221,15 @@ btnStart.addEventListener("click", () => {
       windowId: win.id,
     }, (response) => {
       btnStart.disabled = false;
+      // Reading lastError is what marks it handled; leaving it unread logs an
+      // "Unchecked runtime.lastError" warning on every failed send.
+      const err = chrome.runtime.lastError;
       // Only draw a live session once the background confirms one. Drawing it
       // optimistically hid the case where a tab was missing and the session
       // was never actually running.
-      if (!response || !response.ok) {
+      if (err || !response || !response.ok) {
         updateUI(false, 0, rounds);
-        setStatus("⚠️ " + ((response && response.error) || "Could not start Ping Pong"));
+        setStatus("⚠️ " + ((response && response.error) || (err && err.message) || "Could not start Ping Pong"));
         return;
       }
       updateUI(true, 0, rounds);
@@ -240,6 +243,7 @@ btnStop.addEventListener("click", () => {
 });
 
 chrome.runtime.sendMessage({ action: "getChainState" }, (response) => {
+  void chrome.runtime.lastError;   // read it so Chrome does not log it as unchecked
   if (!response) return;
   updateUI(response.active, response.currentRound, response.maxRounds);
   if (!response.active && response.lastError) setStatus("⚠️ " + response.lastError);

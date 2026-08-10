@@ -5,6 +5,8 @@ State of the world. Read this first; update it before the session ends.
 **Last updated:** 2026-08-10
 **Version:** 3.3.0 (was 3.2.0)
 **Modes:** BUILD
+**Git:** `main` pushed to origin at `8a7977a`. A second review pass since then is
+**uncommitted** — see "Second review pass" below.
 
 ---
 
@@ -60,6 +62,39 @@ it read clean forever) and the other banned `console.log`, which this project's
 logging convention requires.
 
 ---
+
+## Second review pass (2026-08-10, uncommitted)
+
+A review of the v3.3.0 code itself found six defects introduced by that work:
+
+1. **Rehydrate/startChain race.** The worker wakes *because* a message arrived, so
+   rehydration and the first message handler ran concurrently: rehydrate's write to
+   `chainState` landed after `startChain` had built a new session and replaced it
+   with the previous one, then polled the old tabs. Fixed with a `ready` promise
+   that every chainState-touching handler awaits.
+2. **`submitted: true` was a claim about clicking, not sending.** The Enter
+   fallback returned true having only dispatched a keydown. Now the composer is
+   observed to clear, and `clicked` / `submitted` are reported separately — only a
+   failure to click is fatal, because treating an unverified send as fatal would
+   kill working sessions on a site that clears its composer slowly.
+3. **Grok role cache could go stale.** React can reuse a DOM node, so a cached
+   user/assistant verdict on the element about to be captured could bounce the
+   wrong text. The capture path now re-checks; the counting path still uses the
+   cache.
+4. **Gate gap: script load order was never checked.** `shared.js` must be
+   evaluated before its consumers in four places. Reversing them is a runtime
+   ReferenceError inside a callback — invisible to every other check.
+5. **Gate gap: hotkey parity compared keys, not values.** Ctrl+Shift+1 in one file
+   and Ctrl+Shift+9 in the other passed while the popup showed a binding that
+   never fired.
+6. **Store copy claimed a feature that does not exist** — "or your own prompt" in
+   the Modify description, and it omitted Compare. Also a stale line count.
+
+Minor: popup now reads `chrome.runtime.lastError` (console noise), a stopped
+session's reason survives a worker restart so the popup can explain itself, and
+broadcast no longer sleeps after its last target.
+
+Gate is now 11 checks, all 13 canaries fire.
 
 ## Verified
 

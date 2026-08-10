@@ -22,7 +22,7 @@ FEATURES
 
 Right-click bounce — PingIt any response to another AI instantly.
 Highlight bounce — Select specific text, PingIt just that part.
-Modify mode — Add instructions: Critique, Improve, Expand, or your own prompt.
+Modify mode — Add instructions: Critique, Improve, Compare, or Expand.
 Broadcast — Send to all AIs simultaneously.
 Ping Pong — Start an autonomous conversation between two AIs. Watch them debate, iterate on code, or refine ideas without lifting a finger.
 Hotkeys — Ctrl+Shift+1 through 5 for each AI. Fully customizable.
@@ -158,7 +158,7 @@ PingIt is a Chrome extension (Manifest V3) that routes AI responses between Chat
 
 The interesting technical challenge was Ping Pong mode — autonomous multi-turn conversations between two AIs. The detection engine runs as a service worker polling every 1s with a state machine (idle → streaming → cooldown → complete) that watches for text stability. Each LLM has platform-specific quirks: Claude uses ProseMirror, Gemini uses Quill, Grok's React textarea only accepts document.execCommand, and Grok's submit button disabled state is not a streaming indicator (it's form validation — cost me two debugging sessions to find that).
 
-No API keys, no server, runs entirely client-side. ~1,900 lines of vanilla JS.
+No API keys, no server, runs entirely client-side. ~2,050 lines of vanilla JS, no dependencies and no build step.
 
 [link]
 ```

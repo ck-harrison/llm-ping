@@ -75,7 +75,26 @@ function persistChainState() {
   });
 }
 
+// The worker wakes BECAUSE a message arrived, so rehydration and the first
+// message handler run concurrently: rehydrate yields at its first await, the
+// module finishes evaluating, and the queued message is dispatched. Without this
+// gate, rehydrate's assignment to chainState lands *after* startChain has built a
+// new session and silently replaces it with the previous one — then polls the old
+// tabs. Every handler that touches chainState waits for rehydration to settle.
+let markReady;
+const ready = new Promise((resolve) => { markReady = resolve; });
+
 (async function rehydrate() {
+  try {
+    await rehydrateChain();
+  } catch (e) {
+    console.error("[LLM PingIt] Rehydration failed:", e.message);
+  } finally {
+    markReady();
+  }
+})();
+
+async function rehydrateChain() {
   let saved = null;
   try {
     const stored = await chrome.storage.session.get({ chainState: null });
@@ -84,7 +103,19 @@ function persistChainState() {
     console.error("[LLM PingIt] Could not read persisted chain state:", e.message);
     return;
   }
-  if (!saved || !saved.active) return;
+  if (!saved) return;
+
+  // A session that had already stopped still carries why it stopped. Keeping it
+  // means the popup can explain itself after a worker restart instead of showing
+  // a blank status.
+  if (!saved.active) {
+    chainState = Object.assign(freshChainState(), {
+      currentRound: saved.currentRound || 0,
+      stoppedReason: saved.stoppedReason || null,
+      lastError: saved.lastError || null,
+    });
+    return;
+  }
 
   const [aTab, bTab] = await Promise.all([getTabSafe(saved.tabA), getTabSafe(saved.tabB)]);
   if (!aTab || !bTab) {
@@ -101,8 +132,8 @@ function persistChainState() {
   console.log(`[LLM PingIt] Service worker restarted mid-session — resuming Ping Pong at round ${chainState.currentRound}/${chainState.maxRounds}`);
   await startBackgroundPolling();
   broadcastChainState();
-  notifyTab(chainState.tabA, "🏓 Ping Pong resumed after extension restart");
-})();
+  await notifyTab(chainState.tabA, "🏓 Ping Pong resumed after extension restart");
+}
 
 // ══════════════════════════════════════════════════
 //  CONTEXT MENUS
@@ -239,7 +270,7 @@ async function broadcastTo(text, sourceTab) {
 
   const sent = [];
   const failed = [];
-  for (const [targetId, target] of enabled) {
+  for (const [index, [targetId, target]] of enabled.entries()) {
     try {
       const result = await routeToTarget(target, targetId, text, { sourceWindowId: sourceTab?.windowId });
       if (result.ok) sent.push(target.label);
@@ -248,7 +279,8 @@ async function broadcastTo(text, sourceTab) {
       failed.push(`${target.label} (${e.message})`);
       console.error(`[LLM PingIt] Broadcast to ${target.label} failed:`, e);
     }
-    await sleep(1000);
+    // Space out the tab switches, but not after the last one.
+    if (index < enabled.length - 1) await sleep(1000);
   }
 
   // Attempted vs succeeded vs failed, never one number where three are true.
@@ -273,15 +305,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // These two wait for rehydration so they cannot read or clobber a half-restored
+  // session. Both now respond asynchronously, hence `return true`.
   if (msg.action === "stopChain") {
-    stopChain("Stopped by user");
-    sendResponse({ ok: true });
-    return false;
+    ready.then(() => {
+      stopChain("Stopped by user");
+      sendResponse({ ok: true });
+    });
+    return true;
   }
 
   if (msg.action === "getChainState") {
-    sendResponse(publicChainState());
-    return false;
+    ready.then(() => sendResponse(publicChainState()));
+    return true;
   }
 
   if (msg.action === "hotkeyBounce") {
@@ -333,6 +369,7 @@ function broadcastChainState() {
 // ══════════════════════════════════════════════════
 
 async function startChain({ llmA, llmB, mode, maxRounds, windowId }) {
+  await ready;   // never build a session on top of a half-restored one
   if (!TARGETS[llmA] || !TARGETS[llmB]) {
     return { ok: false, error: "Unknown LLM selected." };
   }
@@ -703,7 +740,13 @@ async function handleResponseComplete(senderTabId) {
   // A failed bounce must end the session loudly. The content script used to
   // swallow injection errors, fall back to the clipboard and report success, so
   // the chain waited forever for a reply to a message that was never sent.
-  if (!result.ok || !result.submitted) {
+  //
+  // `clicked` and `submitted` are deliberately separate claims. Only a failure to
+  // click stops the session: `submitted` means the composer was observed to clear,
+  // and treating an unverified-but-clicked send as fatal would kill a working
+  // session on any site that clears its composer slowly. An unverified send that
+  // really did fail still gets caught by the stall watchdog.
+  if (!result.ok || !result.clicked) {
     chainState.bouncing = false;
     const why = !result.ok
       ? (result.reason || "injection failed")
@@ -712,6 +755,9 @@ async function handleResponseComplete(senderTabId) {
     await notifyTab(nextTabId, `⚠️ Ping Pong stopped — could not send to ${nextTarget.label} (${why}).`);
     await notifyTab(senderTabId, `⚠️ Ping Pong stopped — could not send to ${nextTarget.label}.`);
     return;
+  }
+  if (!result.submitted) {
+    console.log(`[LLM PingIt] Send to ${nextTargetId} is UNVERIFIED — clicked, but the composer did not clear. Continuing; the watchdog will catch it if nothing comes back.`);
   }
 
   chainState.currentRound = roundNumber;
