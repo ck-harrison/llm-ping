@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
   "name": "LLM PingIt",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Ping responses between AI chatbots — bounce, broadcast, or start a Ping Pong conversation.",
+  "minimum_chrome_version": "102",
   "permissions": [
     "contextMenus",
-    "activeTab",
     "storage",
     "tabs",
     "scripting",
@@ -13,12 +13,10 @@
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
-    "https://chat.openai.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
     "https://copilot.microsoft.com/*",
-    "https://grok.com/*",
-    "https://poe.com/*"
+    "https://grok.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -39,13 +37,12 @@
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*",
         "https://claude.ai/*",
         "https://gemini.google.com/*",
         "https://copilot.microsoft.com/*",
         "https://grok.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["shared.js", "content.js"],
       "css": ["toast.css"],
       "run_at": "document_idle"
     }

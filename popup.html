@@ -137,6 +137,10 @@
     }
     .hotkey-input:focus { border-color: #6C5CE7; outline: none; background: #333; }
     .hotkey-input.recording { border-color: #e74c3c; background: #2a1a1a; }
+    .hotkey-warning {
+      font-size: 10px; color: #e74c3c; line-height: 1.4; margin: 6px 0 0 0;
+    }
+    .hotkey-warning:empty { display: none; }
   </style>
 </head>
 <body>
@@ -166,6 +170,7 @@
   <div class="section-body" id="hotkeys-body">
     <div class="setting-desc" style="margin:6px 0;">Click a key combo to reassign. Press new keys to save.</div>
     <div id="hotkey-settings"></div>
+    <div class="hotkey-warning" id="hotkey-warning"></div>
   </div>
 
   <hr class="divider">
@@ -224,6 +229,7 @@
     </div>
   </div>
 
+  <script src="shared.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

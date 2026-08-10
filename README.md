@@ -8,7 +8,7 @@ PingIt is a Chrome extension that sends AI responses between ChatGPT, Claude, Ge
 
 - **Right-click bounce** — PingIt any response to another AI instantly
 - **Highlight bounce** — Select specific text, PingIt just that part
-- **Modify mode** — Add instructions: Critique, Improve, Expand
+- **Modify mode** — Add instructions: Critique, Improve, Compare, or Expand
 - **Broadcast** — Send to all AIs simultaneously
 - **Ping Pong** — Two AIs debate autonomously (default 5 rounds, up to 50)
 - **Hotkeys** — Ctrl+Shift+1–5 for each AI, fully customizable
@@ -41,14 +41,33 @@ PingIt is a Chrome extension that sends AI responses between ChatGPT, Claude, Ge
 5. Type a question in AI A and submit
 6. Watch them go back and forth automatically
 
+A session ends when it hits the round limit, when you press Stop, or when it
+cannot continue — a closed tab, a failed send, or three minutes with nothing
+changing. It tells you which, in the page and in the popup, rather than sitting
+on a round number that will never advance.
+
+## Development
+
+No build step, no dependencies.
+
+```bash
+node scripts/gate.js        # quality gate: syntax, tests, parity, packaging safety
+node --test                 # unit tests
+bash scripts/package.sh     # build the store zip from an explicit allowlist
+```
+
 ## Privacy
 
 PingIt runs entirely in your browser. No data leaves your machine. No analytics. No tracking. No server.
 
+The one thing worth knowing: when injection into a target site fails, PingIt
+falls back to copying the text to your clipboard so you can paste it yourself.
+That puts the captured response on your system clipboard.
+
 ## Version
 
-3.2.0
+3.3.0
 
 ## License
 
-[TBD]
+MIT — see `LICENSE`. Fork it, ship it, do what you like with it.

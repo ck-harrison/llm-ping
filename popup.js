@@ -1,3 +1,6 @@
+// ── LLM PingIt – Popup v3.3.0 ──
+// clampRounds / formatting helpers come from shared.js (loaded before this file).
+
 const TARGETS = {
   claude:  { label: "Claude" },
   chatgpt: { label: "ChatGPT" },
@@ -6,14 +9,18 @@ const TARGETS = {
   grok:    { label: "Grok" },
 };
 
+// Keep in sync with DEFAULT_HOTKEYS in content.js — the gate checks this.
 const DEFAULT_HOTKEYS = {
   claude:    { ctrl: true, shift: true, alt: false, key: "1" },
   chatgpt:   { ctrl: true, shift: true, alt: false, key: "2" },
   gemini:    { ctrl: true, shift: true, alt: false, key: "3" },
   copilot:   { ctrl: true, shift: true, alt: false, key: "4" },
-  broadcast: { ctrl: true, shift: true, alt: false, key: "0" },
   grok:      { ctrl: true, shift: true, alt: false, key: "5" },
+  broadcast: { ctrl: true, shift: true, alt: false, key: "0" },
 };
+
+const MIN_ROUNDS = 1;
+const MAX_ROUNDS = 50;
 
 // ══════════════════════════════════════════════════
 //  HOTKEY SETTINGS
@@ -30,11 +37,33 @@ function formatHotkey(hk) {
   return parts.join("+");
 }
 
+function hotkeySignature(hk) {
+  if (!hk || !hk.key) return null;
+  return [hk.ctrl ? "c" : "", hk.alt ? "a" : "", hk.shift ? "s" : "", hk.key].join("|");
+}
+
 const hotkeyContainer = document.getElementById("hotkey-settings");
+const hotkeyWarning = document.getElementById("hotkey-warning");
 const hotkeyTargets = { ...TARGETS, broadcast: { label: "Broadcast" } };
 
 chrome.storage.sync.get({ hotkeys: DEFAULT_HOTKEYS }, (data) => {
   const hotkeys = { ...DEFAULT_HOTKEYS, ...data.hotkeys };
+
+  // Two targets can be assigned the same combo, and the first match in iteration
+  // order silently wins. Say so rather than letting one hotkey look broken.
+  function checkConflicts() {
+    const seen = {};
+    const clashes = [];
+    for (const [id, hk] of Object.entries(hotkeys)) {
+      const sig = hotkeySignature(hk);
+      if (!sig) continue;
+      if (seen[sig]) clashes.push(`${formatHotkey(hk)} is set for both ${hotkeyTargets[seen[sig]].label} and ${hotkeyTargets[id].label}`);
+      else seen[sig] = id;
+    }
+    hotkeyWarning.textContent = clashes.length
+      ? `⚠️ ${clashes.join("; ")}. Only the first will fire.`
+      : "";
+  }
 
   for (const [id, target] of Object.entries(hotkeyTargets)) {
     const row = document.createElement("div");
@@ -61,10 +90,9 @@ chrome.storage.sync.get({ hotkeys: DEFAULT_HOTKEYS }, (data) => {
       e.preventDefault();
       e.stopPropagation();
 
-      // Ignore lone modifier presses
       if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
 
-      // Normalize key using e.code (immune to shift-modified chars)
+      // e.code gives the physical key, immune to shift-modified characters.
       let normalizedKey = e.key.toLowerCase();
       const code = e.code || "";
       if (code.startsWith("Digit")) normalizedKey = code.charAt(5).toLowerCase();
@@ -78,7 +106,6 @@ chrome.storage.sync.get({ hotkeys: DEFAULT_HOTKEYS }, (data) => {
         key: normalizedKey,
       };
 
-      // Require at least one modifier
       if (!hk.ctrl && !hk.alt && !hk.shift) {
         input.value = formatHotkey(hotkeys[id]);
         input.classList.remove("recording");
@@ -90,6 +117,7 @@ chrome.storage.sync.get({ hotkeys: DEFAULT_HOTKEYS }, (data) => {
       input.classList.remove("recording");
       input.blur();
       chrome.storage.sync.set({ hotkeys });
+      checkConflicts();
     });
 
     input.addEventListener("blur", () => {
@@ -103,6 +131,8 @@ chrome.storage.sync.get({ hotkeys: DEFAULT_HOTKEYS }, (data) => {
     row.appendChild(input);
     hotkeyContainer.appendChild(row);
   }
+
+  checkConflicts();
 });
 
 // ══════════════════════════════════════════════════
@@ -147,7 +177,6 @@ const btnStart = document.getElementById("btnStart");
 const btnStop = document.getElementById("btnStop");
 const chainStatus = document.getElementById("chainStatus");
 
-// Populate dropdowns
 for (const [id, target] of Object.entries(TARGETS)) {
   const optA = document.createElement("option"); optA.value = id; optA.textContent = target.label;
   const optB = document.createElement("option"); optB.value = id; optB.textContent = target.label;
@@ -155,25 +184,32 @@ for (const [id, target] of Object.entries(TARGETS)) {
   chainB.appendChild(optB);
 }
 
-// Set defaults
 chrome.storage.sync.get({ chainA: "chatgpt", chainB: "claude", chainRounds: 5 }, (data) => {
   chainA.value = data.chainA;
   chainB.value = data.chainB;
-  chainRounds.value = data.chainRounds;
+  chainRounds.value = clampRounds(data.chainRounds, MIN_ROUNDS, MAX_ROUNDS);
 });
 
-// Save on change
 chainA.addEventListener("change", () => chrome.storage.sync.set({ chainA: chainA.value }));
 chainB.addEventListener("change", () => chrome.storage.sync.set({ chainB: chainB.value }));
-chainRounds.addEventListener("change", () => chrome.storage.sync.set({ chainRounds: parseInt(chainRounds.value) || 5 }));
 
-// Start chain — always raw mode
+// min/max on a number input is UI-only — typing past it is accepted. Clamp for real.
+chainRounds.addEventListener("change", () => {
+  const rounds = clampRounds(chainRounds.value, MIN_ROUNDS, MAX_ROUNDS);
+  chainRounds.value = rounds;
+  chrome.storage.sync.set({ chainRounds: rounds });
+});
+
 btnStart.addEventListener("click", () => {
   if (chainA.value === chainB.value) {
-    chainStatus.textContent = "⚠️ Pick two different LLMs";
-    chainStatus.className = "chain-status";
+    setStatus("⚠️ Pick two different LLMs");
     return;
   }
+
+  const rounds = clampRounds(chainRounds.value, MIN_ROUNDS, MAX_ROUNDS);
+  chainRounds.value = rounds;
+  setStatus("Starting…");
+  btnStart.disabled = true;
 
   chrome.windows.getCurrent((win) => {
     chrome.runtime.sendMessage({
@@ -181,67 +217,75 @@ btnStart.addEventListener("click", () => {
       llmA: chainA.value,
       llmB: chainB.value,
       mode: "raw",
-      maxRounds: parseInt(chainRounds.value) || 5,
+      maxRounds: rounds,
       windowId: win.id,
+    }, (response) => {
+      btnStart.disabled = false;
+      // Only draw a live session once the background confirms one. Drawing it
+      // optimistically hid the case where a tab was missing and the session
+      // was never actually running.
+      if (!response || !response.ok) {
+        updateUI(false, 0, rounds);
+        setStatus("⚠️ " + ((response && response.error) || "Could not start Ping Pong"));
+        return;
+      }
+      updateUI(true, 0, rounds);
     });
   });
-
-  updateUI(true, 0, parseInt(chainRounds.value) || 5);
 });
 
-// Stop chain
 btnStop.addEventListener("click", () => {
   chrome.runtime.sendMessage({ action: "stopChain" });
   updateUI(false);
 });
 
-// Get initial state
 chrome.runtime.sendMessage({ action: "getChainState" }, (response) => {
-  if (response) {
-    updateUI(response.active, response.currentRound, response.maxRounds);
+  if (!response) return;
+  updateUI(response.active, response.currentRound, response.maxRounds);
+  if (!response.active && response.lastError) setStatus("⚠️ " + response.lastError);
+  else if (!response.active && response.stoppedReason && response.currentRound > 0) {
+    setStatus(`✓ ${response.currentRound} rounds — ${response.stoppedReason}`);
   }
 });
 
-// Listen for state updates
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === "chainStateUpdate") {
     updateUI(msg.state.active, msg.state.currentRound, msg.state.maxRounds);
+    if (!msg.state.active && msg.state.stoppedReason) {
+      setStatus(`${msg.state.currentRound} rounds — ${msg.state.stoppedReason}`);
+    }
   }
 });
 
+function setStatus(text, active) {
+  chainStatus.textContent = text;
+  chainStatus.className = active ? "chain-status active" : "chain-status";
+}
+
 function updateUI(active, currentRound = 0, maxRounds = 5) {
+  btnStart.style.display = active ? "none" : "block";
+  btnStop.style.display = active ? "block" : "none";
+  chainA.disabled = active;
+  chainB.disabled = active;
+  chainRounds.disabled = active;
+
   if (active) {
-    btnStart.style.display = "none";
-    btnStop.style.display = "block";
-    chainA.disabled = true;
-    chainB.disabled = true;
-    chainRounds.disabled = true;
-    chainStatus.textContent = `🏓 Ping Pong — round ${currentRound}/${maxRounds}`;
-    chainStatus.className = "chain-status active";
+    setStatus(`🏓 Ping Pong — round ${currentRound}/${maxRounds}`, true);
+  } else if (currentRound > 0) {
+    setStatus(`✓ Completed ${currentRound} rounds`);
   } else {
-    btnStart.style.display = "block";
-    btnStop.style.display = "none";
-    chainA.disabled = false;
-    chainB.disabled = false;
-    chainRounds.disabled = false;
-    if (currentRound > 0) {
-      chainStatus.textContent = `✓ Completed ${currentRound} rounds`;
-    } else {
-      chainStatus.textContent = "";
-    }
-    chainStatus.className = "chain-status";
+    setStatus("");
   }
 }
 
 // ══════════════════════════════════════════════════
-//  COLLAPSIBLE SECTIONS
+//  COLLAPSIBLE SECTIONS + MODAL
 // ══════════════════════════════════════════════════
 
 document.querySelectorAll(".section-toggle").forEach((toggle) => {
   const section = toggle.dataset.section;
   const body = document.getElementById(section + "-body");
 
-  // Load saved state (default: collapsed)
   chrome.storage.sync.get({ [`section_${section}`]: false }, (data) => {
     if (data[`section_${section}`]) {
       toggle.classList.add("open");
