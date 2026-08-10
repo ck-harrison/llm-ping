@@ -1,4 +1,4 @@
-// ── LLM PingIt – Content Script v3.4.1 ──
+// ── LLM PingIt – Content Script v3.4.2 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //

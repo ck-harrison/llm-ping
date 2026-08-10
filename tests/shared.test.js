@@ -48,6 +48,25 @@ test("cleanText strips per-site speaker prefixes", () => {
   assert.equal(cleanText("Answer (Claude said) here"), "Answer  here");
 });
 
+test("cleanText strips Grok's thinking indicator from the front of a capture", () => {
+  // Observed in a real 8-round session: every Grok turn arrived at Gemini with
+  // "Worked for 6s" on the front, because the indicator lives inside the message
+  // bubble that capture reads.
+  assert.equal(cleanText("Worked for 6s\n\nAh, there you are."), "Ah, there you are.");
+  assert.equal(cleanText("Worked for 5s\nHello"), "Hello");
+  assert.equal(cleanText("Thought for 12 seconds\n\nHello"), "Hello");
+  assert.equal(cleanText("Thinking for 3 min\nHello"), "Hello");
+  // Only at the start — the same words mid-response are the model's own.
+  assert.equal(
+    cleanText("I worked for 6s on this problem."),
+    "I worked for 6s on this problem."
+  );
+  assert.equal(
+    cleanText("Here is the answer.\n\nWorked for 6s was the log line."),
+    "Here is the answer.\n\nWorked for 6s was the log line."
+  );
+});
+
 test("cleanText collapses 3+ blank lines to one", () => {
   assert.equal(cleanText("a\n\n\n\n\nb"), "a\n\nb");
 });

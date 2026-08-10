@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.4.1 ──
+// ── LLM PingIt – Shared pure helpers v3.4.2 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -40,6 +40,11 @@
     if (!text) return "";
     return text
       .replace(/\n{3,}/g, "\n\n")
+      // Grok prefixes a response with its own thinking indicator — "Worked for 6s",
+      // "Thought for 12 seconds". It sits inside the message bubble, so capture
+      // takes it, and every bounced turn arrived at the other model with a stray
+      // timing line on the front. Only stripped at the start of a capture.
+      .replace(/^(?:worked|thought|thinking)\s+for\s+\d+\s*(?:s|sec|secs|seconds|m|min|mins|minutes)?\b[ \t]*\n*/i, "")
       .replace(/^copilot\s+said\s+/i, "")
       .replace(/^copilot\s+said[:.]?\s*/gim, "")
       .replace(/^copilot\s*\n/i, "")

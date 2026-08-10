@@ -76,7 +76,7 @@ That puts the captured response on your system clipboard.
 
 ## Version
 
-3.4.1
+3.4.2
 
 ## License
 
