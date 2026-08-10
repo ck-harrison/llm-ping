@@ -1,4 +1,4 @@
-// ── LLM PingIt – Popup v3.6.1 ──
+// ── LLM PingIt – Popup v3.7.0 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {
@@ -18,6 +18,11 @@ const DEFAULT_HOTKEYS = {
   grok:      { ctrl: true, shift: true, alt: false, key: "5" },
   broadcast: { ctrl: true, shift: true, alt: false, key: "0" },
 };
+
+// Shown in the header. Twice now, a confusing report has turned out to be a stale
+// service worker running older code — this makes "which version is loaded?" a glance
+// rather than a trip to chrome://extensions.
+document.getElementById("version").textContent = "v" + chrome.runtime.getManifest().version;
 
 const MIN_ROUNDS = ROUND_LIMITS.MIN;
 const MAX_ROUNDS = ROUND_LIMITS.MAX;

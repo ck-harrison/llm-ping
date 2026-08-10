@@ -343,6 +343,27 @@ Two separate bugs, both mine, and the "long" part is the tell for the first:
 
 Both canaried: reverting either one fails its test.
 
+## v3.7.0 — short replies complete promptly (2026-08-10)
+
+Reported: stalled mid-session on a one-word response ("Acknowledged", 12 chars).
+
+v3.6.0 had already made that completable, but only after 25 seconds of stability —
+long enough to look like a stall, which is a bad answer even when it eventually
+works. The fix was to use a signal that was already there: `sawStreaming`.
+
+Four of the five sites report when they are generating. Once such a site has said
+it started and then stopped, and the text has held still for the normal window,
+there is nothing left to wait for at any length — the streaming indicator answers
+the question the length floor was standing in for. So short text now completes at
+the normal 4s window when streaming was ever observed, and holds out for 25s only
+where no such signal exists (Grok, by design — no DOM element there is
+trustworthy).
+
+Also added: **the popup header shows the running version.** Twice now a confusing
+report has turned out to be a stale service worker running older code, and "which
+version is loaded?" was a trip to chrome://extensions. browser-check asserts the
+header matches the manifest.
+
 ## STILL not verified — needs your logged-in browser
 
 A throwaway profile has no accounts, and the two Cloudflare-gated sites cannot be

@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.6.1 ──
+// ── LLM PingIt – Background Service Worker v3.7.0 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.

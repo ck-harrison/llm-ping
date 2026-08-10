@@ -333,25 +333,42 @@ test("the streaming flag during cooldown also resumes", () => {
   assert.equal(r.event, "resumed");
 });
 
-test("a short reply completes on the slower path instead of hanging", () => {
-  // Reported from real use: a genuinely short reply sat in cooldown until the
-  // 3-minute stall watchdog killed the session, because it never cleared
-  // MIN_COMPLETE_LEN. It now completes after a much longer stability window.
-  const short = "Agreed, let's go.";   // 17 chars: under MIN_COMPLETE_LEN
+test("a short reply completes at the normal window when the site reported streaming", () => {
+  // "Acknowledged" is 12 chars — under MIN_COMPLETE_LEN. On ChatGPT, Claude, Gemini
+  // and Copilot the page tells us when it is generating, so once streaming stops and
+  // the text holds still there is nothing left to wait for. Making it wait the long
+  // window made a one-word reply look like a stall.
+  const short = "Acknowledged";
   assert.ok(short.length < 20 && short.length > 3);
 
   let r = advancePollPhase(idleAt("old", 1), { msgCount: 2, text: short, streaming: true }, 1000);
+  assert.equal(r.state.sawStreaming, true, "the streaming signal must be remembered");
   r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 3000);
   assert.equal(r.state.phase, "cooldown");
-
-  // Not on the fast path…
-  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 5100);
-  assert.equal(r.state.phase, "cooldown", "2s of cooldown must not accept short text");
-
-  // …but it does complete once it has been stable much longer.
-  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 3000 + 25000);
+  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 5000);
   assert.equal(r.state.phase, "complete");
-  assert.equal(r.event, "complete-short", "reported separately so the log says why it was slow");
+  assert.equal(r.event, "complete");
+});
+
+test("a short reply with no streaming signal waits for the long window", () => {
+  // Grok reports nothing about streaming, by design — no DOM element there is
+  // trustworthy. Text stability is the only evidence, so short text has to hold
+  // still much longer before it can be told apart from a placeholder.
+  const short = "Acknowledged";
+  let r = advancePollPhase(idleAt("old", 1), { msgCount: 2, text: short, streaming: false }, 1000);
+  assert.equal(r.state.phase, "streaming", "a new message still starts a response");
+  assert.equal(r.state.sawStreaming, false);
+  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 3100);
+  assert.equal(r.state.phase, "cooldown");
+
+  // The normal window is not enough without that signal…
+  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 5200);
+  assert.equal(r.state.phase, "cooldown");
+
+  // …but the long one is.
+  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 3100 + 25000);
+  assert.equal(r.state.phase, "complete");
+  assert.equal(r.event, "complete-short");
 });
 
 test("text below SHORT_MIN_LEN still never completes", () => {

@@ -75,7 +75,7 @@ Lives in `shared.js` as `advancePollPhase(state, obs, now, cfg)` — pure, so `t
 - idle→streaming: Nested gate. Outer: `msgCount increased OR streaming`. Inner: `textChanged OR streaming OR count jumped 2+`. Both must pass — the inner gate exists because these sites re-render without new content.
 - streaming→cooldown: Text stable 2 seconds.
 - cooldown→complete: Text still stable 2 more seconds (4s total), and length > `MIN_COMPLETE_LEN` (20).
-- **Short replies take a slower path.** Text over `SHORT_MIN_LEN` (3) but under 20 completes only after `SHORT_COMPLETE_MS` (25s) of stability, and reports `complete-short` so the log says why it was slow. Do not simply lower `MIN_COMPLETE_LEN` instead: that floor is accidentally doing a second job, keeping a brief placeholder left in a message bubble from being accepted as the response. A long window distinguishes a real short answer from a transient one.
+- **Short replies depend on whether the site reports streaming.** Text over `SHORT_MIN_LEN` (3) but under 20 completes at the normal window **if `sawStreaming` is set** — the page told us it started and stopped generating, which is exactly the evidence the length floor was standing in for. With no streaming signal ever seen (Grok, by design) it waits `SHORT_COMPLETE_MS` (25s) and reports `complete-short`. Do not simply lower `MIN_COMPLETE_LEN`: that floor is accidentally doing a second job, keeping a brief placeholder left in a message bubble from being accepted as the response.
 - Polling: 1s interval from the service worker (immune to tab throttling).
 - `waiting` phase: tab B is not polled until A's answer has been bounced to it.
 
@@ -140,6 +140,10 @@ response was received", which names neither the cause nor the fix. The backgroun
 listener therefore answers every unknown action with an explicit "reload the
 extension" message, and the popup translates the raw Chrome error into the same
 advice.
+
+**The popup header shows the running version.** Check it first when behaviour does
+not match the code — twice a confusing report has turned out to be a stale service
+worker. `browser-check` asserts it matches the manifest.
 
 After any change: reload the card at `chrome://extensions`, **and reload the AI
 tabs** — the content script already injected into an open tab is orphaned by a

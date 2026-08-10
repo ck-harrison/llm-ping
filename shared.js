@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.6.1 ──
+// ── LLM PingIt – Shared pure helpers v3.7.0 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -199,6 +199,7 @@
   function newPollState(phase) {
     return {
       phase: phase || "idle",
+      sawStreaming: false,   // has this site ever reported that it was generating?
       msgCount: 0,
       baselineText: "",
       lastTextLen: 0,
@@ -241,6 +242,9 @@
     // owes us a reset. Neither advances on its own.
     if (s.phase === "waiting" || s.phase === "complete") return { state: s, event: null };
 
+    // Remembered across phases: it says what kind of evidence this site gives us.
+    if (streaming) s.sawStreaming = true;
+
     if (s.phase === "idle") {
       var textChanged = !!text && text !== s.baselineText;
       if (curCount > s.msgCount || streaming) {
@@ -280,11 +284,18 @@
         s.lastTextLen = curLen;
         s.lastChangeTime = now;
         event = "resumed";
-      } else if (now - s.cooldownStart >= c.COOLDOWN_MS && curLen > c.MIN_COMPLETE_LEN) {
+      } else if (now - s.cooldownStart >= c.COOLDOWN_MS && (curLen > c.MIN_COMPLETE_LEN || (s.sawStreaming && curLen > c.SHORT_MIN_LEN))) {
+        // Long text, or short text on a site that told us when it was generating.
+        // A site with a streaming indicator has already answered the question the
+        // length floor was standing in for: it said it started, and it said it
+        // stopped. Waiting longer than the normal window adds nothing, and made a
+        // one-word reply ("Acknowledged") look like a 25-second stall.
         s.phase = "complete";
         event = "complete";
       } else if (now - s.cooldownStart >= c.SHORT_COMPLETE_MS && curLen > c.SHORT_MIN_LEN) {
-        // Same outcome, reported separately so the log says why it took longer.
+        // Short text with no streaming signal ever seen — Grok, where the only
+        // evidence available is that the text stopped changing. Hold out for a much
+        // longer window so a brief placeholder cannot pass as the response.
         s.phase = "complete";
         event = "complete-short";
       }

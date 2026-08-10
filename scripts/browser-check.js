@@ -276,6 +276,11 @@ async function waitForCdp() {
     after.reply && after.reply.active === false && /No open tab/.test(after.reply.lastError || ""),
     JSON.stringify(after.reply));
 
+  const shownVersion = await evaluate(`document.getElementById('version').textContent`);
+  record("Popup shows the running version",
+    shownVersion === `v${manifest.version}`,
+    `header reads "${shownVersion}", manifest is ${manifest.version}`);
+
   // The preflight flow, driven through the real popup: no LLM tabs are open in this
   // profile, so pressing Start must refuse and offer both ways out rather than
   // starting a session that cannot run.
