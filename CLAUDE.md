@@ -74,7 +74,8 @@ Lives in `shared.js` as `advancePollPhase(state, obs, now, cfg)` — pure, so `t
 
 - idle→streaming: Nested gate. Outer: `msgCount increased OR streaming`. Inner: `textChanged OR streaming OR count jumped 2+`. Both must pass — the inner gate exists because these sites re-render without new content.
 - streaming→cooldown: Text stable 2 seconds.
-- cooldown→complete: Text still stable 2 more seconds (4s total), and length > 20.
+- cooldown→complete: Text still stable 2 more seconds (4s total), and length > `MIN_COMPLETE_LEN` (20).
+- **Short replies take a slower path.** Text over `SHORT_MIN_LEN` (3) but under 20 completes only after `SHORT_COMPLETE_MS` (25s) of stability, and reports `complete-short` so the log says why it was slow. Do not simply lower `MIN_COMPLETE_LEN` instead: that floor is accidentally doing a second job, keeping a brief placeholder left in a message bubble from being accepted as the response. A long window distinguishes a real short answer from a transient one.
 - Polling: 1s interval from the service worker (immune to tab throttling).
 - `waiting` phase: tab B is not polled until A's answer has been bounced to it.
 
@@ -102,7 +103,7 @@ The user then gets **Open fresh tabs & start** (opens a new-chat tab for anythin
 - **A participant repeating itself exactly stops the chain.** The global duplicate check cannot catch this: with A and B alternating, `lastBouncedText` holds the other side's text by the time this one speaks again. `lastTextByTab` catches a stuck participant on its second identical response.
 - **Injection is verified:** the content script reports `{ok, clicked, submitted}` and a bounce that could not be clicked **stops the chain with a toast**. It used to fall back to the clipboard and report success, so the chain waited forever for a reply to a message that was never sent.
 - **`clicked` and `submitted` are separate claims, deliberately.** `clicked` is what we did; `submitted` means the composer was observed to clear, which is the only evidence available that a send actually landed (a click can be a no-op and the Enter fallback only dispatches a keydown). Only `!clicked` is fatal — treating an unverified send as fatal would kill working sessions on any site that clears its composer slowly, and a real failure is still caught by the watchdog.
-- **Stall watchdog:** 3 minutes with no state change → stop and say so.
+- **Stall watchdog:** 3 minutes with **no observable activity** → stop, naming who went quiet. Activity means growing text, a live streaming flag, or a changed message count — `hasObservableActivity` in shared.js. It must NOT key on state-machine events: a streaming response emits none for its entire duration, so an event-keyed watchdog killed long answers mid-generation and the session looked like it stopped for no reason. The gate has a wiring check for this, because the helper passes its own unit tests whether or not background.js consults it.
 - **Skip limit:** 3 consecutive skips (duplicate, self-echo, nothing usable) → stop with the reason. A skip resets the tab to idle, which emits state-machine events, which refresh the watchdog — so skips need their own bound or a tab serving the same content spins forever with the watchdog never firing.
 - **Poll failures:** logged every time, with a consecutive-failure count; 5 in a row stops the chain. A closed or navigated chain tab stops or re-baselines it.
 - **Session survival:** chain state is mirrored to `chrome.storage.session`, so a restarted service worker resumes or reports that it could not.
@@ -117,9 +118,9 @@ Hotkeys are implemented as a content-script keydown listener rather than `chrome
 
 ## Known Issues
 
-1. Grok "choose preferred response" — the self-echo check prevents bouncing the user's question, but the session stalls until the user picks manually. The watchdog now ends it after 3 minutes instead of hanging forever.
+1. Grok "choose preferred response" — the self-echo check prevents bouncing the user's question, but the session stalls until the user picks manually. The watchdog now ends it after 3 minutes instead of hanging forever, naming who went quiet.
 2. Mid-response pauses > 4s (thinking, web search) may trigger a premature bounce.
-3. A reply shorter than 20 characters never satisfies the completion gate; the watchdog ends the session. Pinned in the tests as a known limitation.
+3. Capture ignores anything under `CAPTURE_MIN_CHARS` (3), and `MIN_USABLE_CHARS` (4) in background.js is the floor for a usable capture. A one- or two-character reply ("Ok") still stalls the session. These were 10 and 10, which discarded ordinary short answers entirely.
 4. All LLM selectors can break when platforms update their UI. Nothing mechanical can catch this — it needs a human on the live sites.
 5. The transcript starts at the first AI response — the opening prompt you type is never captured, because nothing reads the composer. `formatTranscript` says so in the output rather than letting it read as the whole conversation.
 6. A session over ~2 MB of captured text stops recording the transcript. The cap is recorded and reported in the output, not silently applied.

@@ -283,6 +283,46 @@ and the first capture can read a message from before the session.
 Verified in a real Chrome: pressing Start with no tabs open shows
 "ChatGPT and Claude are not open" and offers only the button that can work.
 
+## v3.6.0 — short replies no longer stall a session (2026-08-10)
+
+Reported from use: a 20-round ChatGPT ↔ Gemini session ran fine and then stopped
+after 4 rounds. The stall watchdog had fired, and the last reply had been short.
+
+Three length floors were fighting an ordinary short answer:
+
+| Floor | Was | Now | Effect when a reply was short |
+|---|---|---|---|
+| capture (content.js) | 10 | 3 | a reply under 10 chars was never captured at all |
+| completion (shared.js) | 20 | 20 + slow path | 11–20 chars sat in cooldown forever |
+| usable (background.js) | 10 | 4 | a short capture was discarded as unusable |
+
+The middle one caused this failure exactly: captured, but unable to complete, so no
+state-machine events fired, so `lastProgressAt` stopped advancing, so the watchdog
+killed the session at three minutes.
+
+`MIN_COMPLETE_LEN` was deliberately **not** lowered. That floor is accidentally
+doing a second job — keeping a brief placeholder left in a message bubble from being
+accepted as a response. Short text instead gets a much longer stability window
+(`SHORT_COMPLETE_MS`, 25s), far beyond any streaming pause and well inside the
+watchdog, and reports `complete-short` so the log says why it was slow.
+
+**The actual cause of that session dying was the watchdog itself.** `lastProgressAt`
+was refreshed only when the state machine emitted an event, and events are emitted
+only at phase transitions — a streaming response emits none for its whole duration.
+So any round that took longer than three minutes to generate was killed
+mid-answer. The watchdog now keys on observable activity (growing text, a live
+streaming flag, a changed message count). The editor's first guess was a short
+reply and their second was "no idea"; the short-reply path below is a real latent
+bug found on the way, but this is what actually fired.
+
+A gate check now asserts background.js consults the activity helper. Removing that
+one line broke no unit test — the helper still passes its own tests in isolation,
+which is exactly the kind of gap a wiring check exists for.
+
+Also: the stall message now names who went quiet — "ChatGPT did not respond for 3
+min (rate limit, or still thinking)" rather than "Stalled — no progress for 3 min",
+which was true and left nowhere to look.
+
 ## STILL not verified — needs your logged-in browser
 
 A throwaway profile has no accounts, and the two Cloudflare-gated sites cannot be

@@ -110,6 +110,10 @@ canary "Mode registry single source" \
   "a mode wrapper missing the {TEXT} placeholder" \
   "perl -0pi -e 's/Please expand on it — add depth, examples, and anything important that was missed:\\\\n\\\\n---\\\\n\{TEXT\}\\\\n---/Please expand on it./' shared.js"
 
+canary "Watchdog keys on observable activity" \
+  "the activity check removed, so the watchdog goes back to keying on phase transitions" \
+  "perl -0pi -e 's/  if \\(active\\) chainState\\.lastProgressAt = now;\\n//' background.js"
+
 canary "Host surface parity" \
   "a host_permission that no target and no content script uses" \
   "node -e 'const fs=require(\"fs\");const m=JSON.parse(fs.readFileSync(\"manifest.json\",\"utf8\"));m.host_permissions.push(\"https://example.com/*\");fs.writeFileSync(\"manifest.json\",JSON.stringify(m,null,2));'"

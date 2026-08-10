@@ -13,6 +13,7 @@ const {
   cleanText,
   applyWrapper,
   advancePollPhase,
+  hasObservableActivity,
   newPollState,
   shouldBounce,
   clampRounds,
@@ -332,15 +333,34 @@ test("the streaming flag during cooldown also resumes", () => {
   assert.equal(r.event, "resumed");
 });
 
-test("a response shorter than MIN_COMPLETE_LEN never completes", () => {
-  // Documented limitation, pinned so a change to it is deliberate: a very short
-  // reply ("Yes.") will not satisfy the completion gate and the watchdog in
-  // background.js is what ends the session.
-  const short = "Yes.";
+test("a short reply completes on the slower path instead of hanging", () => {
+  // Reported from real use: a genuinely short reply sat in cooldown until the
+  // 3-minute stall watchdog killed the session, because it never cleared
+  // MIN_COMPLETE_LEN. It now completes after a much longer stability window.
+  const short = "Agreed, let's go.";   // 17 chars: under MIN_COMPLETE_LEN
+  assert.ok(short.length < 20 && short.length > 3);
+
   let r = advancePollPhase(idleAt("old", 1), { msgCount: 2, text: short, streaming: true }, 1000);
   r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 3000);
   assert.equal(r.state.phase, "cooldown");
-  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 60000);
+
+  // Not on the fast path…
+  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 5100);
+  assert.equal(r.state.phase, "cooldown", "2s of cooldown must not accept short text");
+
+  // …but it does complete once it has been stable much longer.
+  r = advancePollPhase(r.state, { msgCount: 2, text: short, streaming: false }, 3000 + 25000);
+  assert.equal(r.state.phase, "complete");
+  assert.equal(r.event, "complete-short", "reported separately so the log says why it was slow");
+});
+
+test("text below SHORT_MIN_LEN still never completes", () => {
+  // The floor that stops a stray glyph or a truncated placeholder being bounced.
+  const tiny = "ok";
+  let r = advancePollPhase(idleAt("old", 1), { msgCount: 2, text: tiny, streaming: true }, 1000);
+  r = advancePollPhase(r.state, { msgCount: 2, text: tiny, streaming: false }, 3000);
+  assert.equal(r.state.phase, "cooldown");
+  r = advancePollPhase(r.state, { msgCount: 2, text: tiny, streaming: false }, 600000);
   assert.equal(r.state.phase, "cooldown");
   assert.equal(r.event, null);
 });
@@ -368,6 +388,32 @@ test("custom timings are honoured", () => {
   assert.equal(r.state.phase, "cooldown");
   r = advancePollPhase(r.state, { msgCount: 2, text: LONG, streaming: false }, 200, { COOLDOWN_MS: 50 });
   assert.equal(r.state.phase, "complete");
+});
+
+// ── Watchdog activity ──────────────────────────────────────────────────────
+
+test("a streaming response counts as activity for the whole time it streams", () => {
+  // The bug this pins: the stall watchdog keyed on phase transitions, and a
+  // streaming response emits none for its entire duration. A round that took longer
+  // than the watchdog window was killed mid-answer and the session looked like it
+  // stopped for no reason. Reported from real use: 20 rounds requested, stopped at 4.
+  const state = { lastTextLen: 500, msgCount: 3 };
+
+  // Growing text is progress, event or no event.
+  assert.equal(hasObservableActivity(state, { text: "x".repeat(501), msgCount: 3, streaming: false }), true);
+  // The site saying it is generating is progress even when the text has not moved.
+  assert.equal(hasObservableActivity(state, { text: "x".repeat(500), msgCount: 3, streaming: true }), true);
+  // A new message is progress.
+  assert.equal(hasObservableActivity(state, { text: "x".repeat(500), msgCount: 4, streaming: false }), true);
+  // Nothing moving is what the watchdog exists to catch.
+  assert.equal(hasObservableActivity(state, { text: "x".repeat(500), msgCount: 3, streaming: false }), false);
+});
+
+test("hasObservableActivity is safe on missing input", () => {
+  assert.equal(hasObservableActivity(null, { text: "a" }), false);
+  assert.equal(hasObservableActivity({ lastTextLen: 0, msgCount: 0 }, null), false);
+  // An empty tab that stays empty is not activity.
+  assert.equal(hasObservableActivity({ lastTextLen: 0, msgCount: 0 }, { text: "", msgCount: 0 }), false);
 });
 
 // ── Round accounting ───────────────────────────────────────────────────────

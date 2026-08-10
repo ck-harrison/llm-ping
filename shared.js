@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.5.1 ──
+// ── LLM PingIt – Shared pure helpers v3.6.0 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -182,6 +182,18 @@
     STABLE_MS: 2000,
     COOLDOWN_MS: 2000,
     MIN_COMPLETE_LEN: 20,
+    // A genuinely short reply — "Agreed, let's move on." — is longer than
+    // SHORT_MIN_LEN but shorter than MIN_COMPLETE_LEN, so the fast path above will
+    // never accept it and the tab used to sit in cooldown until the stall watchdog
+    // killed the session three minutes later. Reported from real use.
+    //
+    // Why not simply lower MIN_COMPLETE_LEN: the length floor is doing a second job
+    // by accident. A site can leave a brief placeholder in the message bubble while
+    // it works, and a low floor would accept that as the response. So short text
+    // gets a much longer stability window instead — far beyond any streaming pause,
+    // and still well inside the watchdog.
+    SHORT_MIN_LEN: 3,
+    SHORT_COMPLETE_MS: 25000,
   };
 
   function newPollState(phase) {
@@ -195,6 +207,21 @@
       cooldownStart: 0,
       cooldownTextLen: 0,
     };
+  }
+
+  // Is the page visibly doing something right now?
+  //
+  // The stall watchdog used to key on state-machine EVENTS, which are only emitted
+  // at phase transitions. While a response streams, no event fires — the text just
+  // grows — so a round that took longer than the watchdog's window was killed
+  // mid-answer, and the session looked like it had "stopped for no reason". Growing
+  // text, a live streaming flag, or a changed message count are all progress.
+  function hasObservableActivity(state, obs) {
+    if (!state || !obs) return false;
+    if (obs.streaming) return true;
+    if ((obs.text || "").length !== (state.lastTextLen || 0)) return true;
+    if ((obs.msgCount || 0) !== (state.msgCount || 0)) return true;
+    return false;
   }
 
   // advancePollPhase(state, obs, now, cfg) → { state, event }
@@ -256,6 +283,10 @@
       } else if (now - s.cooldownStart >= c.COOLDOWN_MS && curLen > c.MIN_COMPLETE_LEN) {
         s.phase = "complete";
         event = "complete";
+      } else if (now - s.cooldownStart >= c.SHORT_COMPLETE_MS && curLen > c.SHORT_MIN_LEN) {
+        // Same outcome, reported separately so the log says why it took longer.
+        s.phase = "complete";
+        event = "complete-short";
       }
       return { state: s, event: event };
     }
@@ -293,6 +324,7 @@
     isFreshChatUrl: isFreshChatUrl,
     summarisePreflight: summarisePreflight,
     advancePollPhase: advancePollPhase,
+    hasObservableActivity: hasObservableActivity,
     newPollState: newPollState,
     shouldBounce: shouldBounce,
     clampRounds: clampRounds,

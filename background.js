@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.5.1 ──
+// ── LLM PingIt – Background Service Worker v3.6.0 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -55,6 +55,7 @@ function freshChainState() {
     transcript: [],
     transcriptTruncated: false,
     lastTextByTab: {},
+    awaitingTargetId: null,   // whose response the session is waiting for
   };
 }
 
@@ -90,6 +91,9 @@ function buildTranscript() {
 }
 
 const MAX_CONSECUTIVE_SKIPS = 3;
+// Below this a capture is treated as nothing usable and the image fallback is
+// tried. It was 10, which discarded legitimately short replies.
+const MIN_USABLE_CHARS = 4;
 
 // A skip — duplicate text, self-echo, nothing usable — resets the tab to idle and
 // waits. That is right once and wrong forever: each skip cycle emits state-machine
@@ -612,6 +616,7 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
     sourceWindowId: aTab.windowId,
     lastProgressAt: Date.now(),
     startedAt: new Date().toISOString().replace("T", " ").slice(0, 16),
+    awaitingTargetId: llmA,
   });
 
   await injectContentScript(chainState.tabA);
@@ -689,10 +694,18 @@ async function startBackgroundPolling() {
     // while the popup showed a live round number.
     if (chainState.lastProgressAt && Date.now() - chainState.lastProgressAt > STALL_TIMEOUT_MS) {
       const mins = Math.round(STALL_TIMEOUT_MS / 60000);
-      const reason = `Stalled — no progress for ${mins} min`;
+      // Name who went quiet. "Stalled — no progress" is true and leaves the user
+      // with nowhere to look; free tiers throttle after a few quick turns, and a
+      // model that takes longer than this to *start* answering is the common case.
+      const waitingOn = chainState.awaitingTargetId && TARGETS[chainState.awaitingTargetId]
+        ? TARGETS[chainState.awaitingTargetId].label
+        : null;
+      const reason = waitingOn
+        ? `${waitingOn} did not respond for ${mins} min (rate limit, or still thinking)`
+        : `Stalled — no progress for ${mins} min`;
       stopChain(reason);
-      await notifyTab(chainState.tabA, `⚠️ Ping Pong stopped — nothing changed for ${mins} minutes`);
-      await notifyTab(chainState.tabB, `⚠️ Ping Pong stopped — nothing changed for ${mins} minutes`);
+      await notifyTab(chainState.tabA, `⚠️ Ping Pong stopped — ${reason}`);
+      await notifyTab(chainState.tabB, `⚠️ Ping Pong stopped — ${reason}`);
       return;
     }
 
@@ -768,9 +781,15 @@ async function pollTab(tabId, pollCount) {
   }
 
   const now = Date.now();
+  // Measured against the state BEFORE advancing, and separately from the phase
+  // transition: a streaming response emits no event for its whole duration, so a
+  // watchdog keyed only on events killed long answers mid-generation.
+  const active = hasObservableActivity(state, obs);
   const advanced = advancePollPhase(state, obs, now);
   advanced.state.failures = 0;
   bgPollState[tabId] = advanced.state;
+
+  if (active) chainState.lastProgressAt = now;
 
   if (advanced.event) {
     chainState.lastProgressAt = now;
@@ -780,9 +799,10 @@ async function pollTab(tabId, pollCount) {
       console.log(`[LLM PingIt] ${targetId}: text stable, entering cooldown (len=${obs.text.length})`);
     } else if (advanced.event === "resumed") {
       console.log(`[LLM PingIt] ${targetId}: change during cooldown, back to streaming`);
-    } else if (advanced.event === "complete") {
+    } else if (advanced.event === "complete" || advanced.event === "complete-short") {
       const secs = Math.round((now - (advanced.state.streamStartTime || now)) / 1000);
-      console.log(`[LLM PingIt] ${targetId}: RESPONSE COMPLETE (len=${obs.text.length}, total ${secs}s)`);
+      const via = advanced.event === "complete-short" ? " via the short-reply path" : "";
+      console.log(`[LLM PingIt] ${targetId}: RESPONSE COMPLETE${via} (len=${obs.text.length}, total ${secs}s)`);
       await handleResponseComplete(tabId);
     }
   }
@@ -868,7 +888,7 @@ async function handleResponseComplete(senderTabId) {
     return;
   }
 
-  if (!text || text.length < 10) {
+  if (!text || text.length < MIN_USABLE_CHARS) {
     console.log(`[LLM PingIt] Text too short (${text.length} chars), checking for an image-only response...`);
     try {
       const imgResponse = await sendMessageToTab(senderTabId, { action: "getImageFallback" });
@@ -879,7 +899,7 @@ async function handleResponseComplete(senderTabId) {
     } catch (e) {
       console.log("[LLM PingIt] Image fallback check failed:", e.message);
     }
-    if (!text || text.length < 10) {
+    if (!text || text.length < MIN_USABLE_CHARS) {
       const giveUp = recordSkip(`no usable content from ${senderTargetId}`);
       await resetTabToIdle(senderTabId);
       if (giveUp) await stopForRepeatedSkips(senderTabId, `could not read a usable response from ${TARGETS[senderTargetId].label}`);
@@ -980,6 +1000,7 @@ async function handleResponseComplete(senderTabId) {
 
   chainState.currentRound = roundNumber;
   chainState.lastProgressAt = Date.now();
+  chainState.awaitingTargetId = nextTargetId;
 
   await resetTabToIdle(senderTabId);
 

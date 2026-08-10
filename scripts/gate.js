@@ -325,6 +325,28 @@ check("Mode registry single source", () => {
   };
 });
 
+// ── 6d. the watchdog consults observable activity ──────────────────────────
+// The pure rule is unit-tested; this checks background.js actually uses it. Drop
+// the wiring and the watchdog silently goes back to keying on phase transitions,
+// which killed long streaming answers mid-generation. No test can see that, because
+// the helper still passes its own tests in isolation.
+check("Watchdog keys on observable activity", () => {
+  const bg = read("background.js");
+  const problems = [];
+  if (!/hasObservableActivity\(/.test(bg)) problems.push("background.js never calls hasObservableActivity");
+  if (!/if \(active\)\s*chainState\.lastProgressAt/.test(bg)) {
+    problems.push("the activity result does not refresh chainState.lastProgressAt");
+  }
+  if (!/hasObservableActivity: hasObservableActivity/.test(read("shared.js"))) {
+    problems.push("shared.js does not export hasObservableActivity");
+  }
+  return {
+    ok: problems.length === 0,
+    detail: `3 wiring facts checked, ${problems.length} problems${problems.length ? " — " + problems.join("; ") : ""}`,
+    notProven: "that the 3-minute window is the right length, or that the activity rule itself is correct — only that the watchdog consults it",
+  };
+});
+
 // ── 7. host surface parity ─────────────────────────────────────────────────
 
 check("Host surface parity", () => {

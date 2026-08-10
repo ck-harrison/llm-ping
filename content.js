@@ -1,4 +1,4 @@
-// ── LLM PingIt – Content Script v3.5.1 ──
+// ── LLM PingIt – Content Script v3.6.0 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //
@@ -249,6 +249,11 @@
   //  DOM READING
   // ══════════════════════════════════════════════════
 
+  // A real reply can be four characters long ("Yes."). This used to be 10, which
+  // made short answers invisible to capture entirely — the poller saw no change and
+  // the session stalled.
+  var CAPTURE_MIN_CHARS = 3;
+
   var MESSAGE_SELECTORS = {
     "claude.ai": [".font-claude-response", ".standard-markdown"],
     "chatgpt.com": ["[data-message-author-role='assistant']", ".agent-turn", ".markdown.prose"],
@@ -358,9 +363,9 @@
         for (var k = els.length - 1; k >= 0; k--) {
           var el = els[k];
           if (isGrokUserBubble(el, true)) continue;
-          if ((el.textContent || "").trim().length <= 10) continue;
+          if ((el.textContent || "").trim().length <= CAPTURE_MIN_CHARS) continue;
           var text = (el.innerText || el.textContent || "").trim();
-          if (text.length <= 10) continue;
+          if (text.length <= CAPTURE_MIN_CHARS) continue;
           // Claude's ask_user_input widget renders a Skip button plus numbered
           // options; that is chrome, not a response. Keep walking backward.
           if (text.match(/\bSkip\b/) && text.match(/\b[1-4]\b.*\b[1-4]\b/)) continue;
