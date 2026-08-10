@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.5.0 ──
+// ── LLM PingIt – Background Service Worker v3.5.1 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -391,6 +391,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       });
     return true;
   }
+
+  // Always answer, even an action this build does not know.
+  //
+  // Extension pages are read from disk every time they open, but a running service
+  // worker stays in memory — so after an update the popup can be newer than the
+  // worker and send an action it has never heard of. Falling off the end of this
+  // listener without responding produces Chrome's "The message port closed before
+  // a response was received", which says nothing about what to do about it.
+  console.log(`[LLM PingIt] Unknown action "${msg && msg.action}" — this build does not handle it; the extension probably needs reloading`);
+  sendResponse({
+    ok: false,
+    code: "unknown-action",
+    error: `The running extension does not support "${msg && msg.action}". Reload LLM PingIt at chrome://extensions, then reload your AI tabs.`,
+  });
+  return false;
 });
 
 async function handleHotkeyBounce({ targetId, text }, sender) {

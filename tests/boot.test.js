@@ -227,6 +227,21 @@ test("getTranscript returns empty rather than a malformed document", async () =>
   assert.equal(result.entries, 0);
 });
 
+test("an unknown action gets an explicit answer, not a dead port", async () => {
+  // A popup newer than the running worker sends actions this build has never heard
+  // of. Falling off the end of the listener without responding is what produces
+  // Chrome's "The message port closed before a response was received", which tells
+  // the user nothing about the reload that fixes it.
+  const { calls } = bootBackground();
+  const handler = calls.fns["runtime.onMessage"][0];
+  let reply = null;
+  handler({ action: "somethingFromANewerPopup" }, {}, (r) => { reply = r; });
+  assert.ok(reply, "the listener must respond to an action it does not know");
+  assert.equal(reply.ok, false);
+  assert.equal(reply.code, "unknown-action");
+  assert.match(reply.error, /Reload LLM PingIt/);
+});
+
 test("onInstalled builds the context menus", () => {
   const { calls } = bootBackground();
   calls.fns["runtime.onInstalled"][0]();

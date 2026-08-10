@@ -124,6 +124,21 @@ Hotkeys are implemented as a content-script keydown listener rather than `chrome
 5. The transcript starts at the first AI response — the opening prompt you type is never captured, because nothing reads the composer. `formatTranscript` says so in the output rather than letting it read as the whole conversation.
 6. A session over ~2 MB of captured text stops recording the transcript. The cap is recorded and reported in the output, not silently applied.
 
+## Reloading during development
+
+Extension pages (popup) are read from **disk every time they open**; a running
+**service worker stays in memory** until it idles out or the extension is reloaded.
+So after editing, the popup can be newer than the worker and send it an action it
+has never heard of. Chrome reports that as "The message port closed before a
+response was received", which names neither the cause nor the fix. The background
+listener therefore answers every unknown action with an explicit "reload the
+extension" message, and the popup translates the raw Chrome error into the same
+advice.
+
+After any change: reload the card at `chrome://extensions`, **and reload the AI
+tabs** — the content script already injected into an open tab is orphaned by a
+reload.
+
 ## Coding Conventions
 
 - All `console.log`/`warn`/`error` lines carry the `[LLM PingIt]` prefix. The gate checks every one.

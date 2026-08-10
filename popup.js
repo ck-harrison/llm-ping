@@ -1,4 +1,4 @@
-// ── LLM PingIt – Popup v3.5.0 ──
+// ── LLM PingIt – Popup v3.5.1 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {
@@ -241,6 +241,20 @@ chainRounds.addEventListener("change", () => {
   chrome.storage.sync.set({ chainRounds: rounds });
 });
 
+// Chrome's own wording for a message nobody answered is "The message port closed
+// before a response was received", which reads like a bug in the extension rather
+// than the one thing that fixes it. This happens when the popup (read from disk on
+// every open) is newer than the service worker (kept in memory), i.e. right after
+// an update and before a reload.
+function explainError(err, response, fallback) {
+  if (response && response.error) return response.error;
+  const message = (err && err.message) || "";
+  if (/message port closed|Receiving end does not exist|Could not establish connection/i.test(message)) {
+    return "Reload the extension: open chrome://extensions, press \u21bb on LLM PingIt, then reload your AI tabs.";
+  }
+  return message || fallback;
+}
+
 // Held between the preflight and whichever way out of it the user picks.
 let pendingPreflight = null;
 
@@ -274,7 +288,7 @@ btnStart.addEventListener("click", () => {
       btnStart.disabled = false;
       const err = chrome.runtime.lastError;
       if (err || !res || !res.ok) {
-        setStatus("⚠️ " + ((res && res.error) || (err && err.message) || "Could not check the tabs"));
+        setStatus("⚠️ " + explainError(err, res, "Could not check the tabs"));
         return;
       }
 
@@ -309,7 +323,7 @@ btnOpenFresh.addEventListener("click", () => {
     btnOpenFresh.disabled = false;
     const err = chrome.runtime.lastError;
     if (err || !res || !res.ok) {
-      setStatus("⚠️ " + ((res && res.error) || (err && err.message) || "Could not open the tabs"));
+      setStatus("⚠️ " + explainError(err, res, "Could not open the tabs"));
       return;
     }
     const tabIds = {};
@@ -356,7 +370,7 @@ function startSession(windowId, opts) {
     // reports that there is nothing to copy.
     if (err || !response || !response.ok) {
       updateUI(false, 0, rounds, 0);
-      setStatus("⚠️ " + ((response && response.error) || (err && err.message) || "Could not start Ping Pong"));
+      setStatus("⚠️ " + explainError(err, response, "Could not start Ping Pong"));
       return;
     }
     pendingPreflight = null;
