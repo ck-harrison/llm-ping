@@ -3,7 +3,7 @@
 State of the world. Read this first; update it before the session ends.
 
 **Last updated:** 2026-08-10
-**Version:** 3.4.0 (3.2.0 → 3.3.0 review fixes → 3.4.0 features)
+**Version:** 3.4.1 (3.2.0 → 3.3.0 review fixes → 3.4.0 features → 3.4.1 field bug)
 **Modes:** BUILD
 **Git:** `main` pushed to origin. The audit fixes below the v3.4.0 section are the
 only work that may be uncommitted; check `git status`.
@@ -220,6 +220,45 @@ possible on Grok ↔ Gemini, and it verified three things no stub could:
 
 Also confirmed in the same run: tab B stays in the `waiting` phase and is never
 polled until bounced to, exactly as designed.
+
+## v3.4.1 — the first real signed-in session found a real bug (2026-08-10)
+
+The editor ran Gemini ↔ Grok in critique mode, signed in, 8 rounds. The transcript
+showed Gemini critiquing conscientiously while **Grok answered "Hello! How can I
+help you today?" every single round** — it was being submitted an empty message,
+and nothing in the extension noticed.
+
+Cause: **`document.execCommand` is a silent no-op when the document does not have
+focus**, and Ping Pong deliberately did not focus the window (`backgroundMode`
+skipped `chrome.windows.update({focused:true})`). Grok is the only site injected
+with execCommand, so Grok was the only one affected — Gemini writes to the DOM
+directly and needs no focus. The focus-skipping predates this rewrite; what this
+rewrite added was the machinery that should have caught it, and didn't.
+
+Two of the three fixes are for defects I introduced:
+
+1. **`waitForComposerToClear` treated an empty composer as a successful send.**
+   `now === ""` counted as cleared regardless of whether the box ever held
+   anything — so a failed injection reported `submitted: true`. It now requires
+   `before` to be non-empty. This is the second time this exact check has been
+   wrong in the optimistic direction.
+2. **Nothing read the composer back after injecting.** Now it does: empty means the
+   injection did not land, and the bounce fails loudly instead of clicking send on
+   an empty box. Covered by a test, canaried.
+3. **Ping Pong now focuses the window when the target needs it** (`NEEDS_DOCUMENT_FOCUS`,
+   currently just Grok). Grok sessions will steal focus. That is the cost of the
+   only injection method that works there.
+
+Plus the safety net that would have ended that session at round 4 with an accurate
+message: **a participant repeating itself word for word stops the chain.** The
+global duplicate check structurally cannot catch this, because with A and B
+alternating, `lastBouncedText` holds the other side's text by the time this one
+speaks again. `lastTextByTab` closes that hole.
+
+Lesson worth keeping: every check I wrote around the send was biased toward
+reporting success. The failure was not that a check was missing — `submitted` was
+right there — it was that the check could pass without the thing it named ever
+having happened.
 
 ## STILL not verified — needs your logged-in browser
 

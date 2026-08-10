@@ -221,6 +221,11 @@ function bootContent(hostname, runTwice, opts) {
         el.offsetParent = fakeElement();
         return el;
       }
+      // A composer that accepts writes but never reports any text — exactly what
+      // a silently-failing execCommand injection looks like.
+      if (opts.emptyComposer && /contenteditable|textarea|prompt-textarea/i.test(sel)) {
+        return opts.emptyComposer;
+      }
       return null;
     },
     querySelectorAll: () => [],
@@ -302,6 +307,25 @@ test("Grok never reports streaming, even with a visible stop button present", ()
   // and Grok must still say false.
   assert.equal(streamingFor("grok.com", { stopButton: true }), false);
   assert.equal(streamingFor("grok.com", { stopButton: false }), false);
+});
+
+test("an injection that leaves the composer empty is reported as a failure", async () => {
+  // The regression this pins, observed in a real 8-round session: Grok's
+  // execCommand injection is a silent no-op without document focus, so the
+  // composer stayed empty, the send button was clicked anyway, and Grok answered
+  // an empty prompt with the same greeting every round while the extension
+  // reported every bounce as a success.
+  const composer = fakeElement();   // accepts writes, never reports text
+  const { calls } = bootContent("claude.ai", false, { emptyComposer: composer });
+  const handler = calls.fns["runtime.onMessage"][0];
+
+  const reply = await new Promise((resolve) => {
+    const kept = handler({ action: "injectText", text: "a message that should land", target: "claude", autoSubmit: true }, {}, resolve);
+    assert.equal(kept, true, "injectText must keep the message port open");
+  });
+
+  assert.equal(reply.ok, false, "an injection that did not land must not report ok");
+  assert.match(reply.error || "", /composer is still empty/);
 });
 
 // ── What these tests do NOT prove ──────────────────────────────────────────

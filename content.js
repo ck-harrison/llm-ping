@@ -1,4 +1,4 @@
-// ── LLM PingIt – Content Script v3.4.0 ──
+// ── LLM PingIt – Content Script v3.4.1 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //
@@ -465,6 +465,25 @@
     var fn = strategies[target] || function () { return injectGeneric(text); };
 
     return fn().then(function () {
+      // Verify the text actually landed before doing anything else.
+      //
+      // This is the check whose absence produced eight rounds of nonsense: Grok's
+      // injection uses document.execCommand, which is a silent no-op when the
+      // document lacks focus, so the composer stayed empty, the send button was
+      // clicked anyway, and Grok answered an empty prompt with "Hello! How can I
+      // help you today?" every single round. Nothing downstream could tell.
+      var composer = getComposer(target);
+      var landed = composerText(composer);
+      if (!landed) {
+        throw new Error("composer is still empty after injection — the tab may not have had focus");
+      }
+      // A mismatch is reported but not fatal: sites reformat pasted text, and
+      // killing a working session over whitespace would be worse than the warning.
+      var wanted = text.replace(/\s+/g, " ").trim().slice(0, 40);
+      if (wanted && landed.replace(/\s+/g, " ").indexOf(wanted) === -1) {
+        console.log("[LLM PingIt] Composer text does not match what was injected — continuing, but the send may be wrong");
+      }
+
       if (!autoSubmit) {
         showToast("✅ Message loaded — review and press Enter to send");
         return { ok: true, clicked: false, submitted: false, autoSubmit: false };
@@ -521,6 +540,10 @@
   // button may be a no-op, and the Enter-key fallback below returns having only
   // dispatched a keydown.
   function waitForComposerToClear(el, before, timeout) {
+    // An empty composer is only evidence of a send if it had something in it to
+    // begin with. Treating "" as cleared regardless is how a failed injection
+    // reported submitted:true.
+    if (!before) return Promise.resolve(false);
     var deadline = Date.now() + timeout;
     function poll() {
       var now = composerText(el);

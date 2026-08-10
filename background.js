@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.4.0 ──
+// ── LLM PingIt – Background Service Worker v3.4.1 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -15,6 +15,10 @@ const TARGETS = {
 
 // MODES comes from shared.js so the popup's Ping Pong dropdown and this file's
 // context menu cannot drift apart.
+
+// Sites whose injection method needs the document focused to work at all. Only
+// Grok, because it is the only one injected with document.execCommand.
+const NEEDS_DOCUMENT_FOCUS = new Set(["grok"]);
 
 const POLL_INTERVAL_MS = 1000;
 // The whole chainState object — transcript included — is written to
@@ -50,6 +54,7 @@ function freshChainState() {
     startedAt: null,
     transcript: [],
     transcriptTruncated: false,
+    lastTextByTab: {},
   };
 }
 
@@ -784,6 +789,21 @@ async function handleResponseComplete(senderTabId) {
     return;
   }
 
+  // A participant repeating itself word for word is the signature of a stuck
+  // conversation, and the global duplicate check above cannot see it: with A and B
+  // alternating, lastBouncedText holds the *other* side's text by the time this one
+  // speaks again. A real Ping Pong ran eight rounds where Grok answered "Hello! How
+  // can I help you today?" every single time, because its injection was silently
+  // failing — nothing noticed, and the transcript looked like a conversation.
+  const previousFromThisTab = chainState.lastTextByTab[senderTabId];
+  if (previousFromThisTab && previousFromThisTab === cleanedText) {
+    const label = TARGETS[senderTargetId].label;
+    stopChain(`${label} sent an identical response twice in a row`);
+    await notifyTab(senderTabId, `⚠️ Ping Pong stopped — ${label} repeated itself exactly, so it is probably not receiving the message.`);
+    return;
+  }
+  chainState.lastTextByTab[senderTabId] = cleanedText;
+
   chainState.consecutiveSkips = 0;
   // Recorded before the round-limit check, so the final response of a session is
   // in the transcript even though it is never bounced anywhere.
@@ -980,8 +1000,12 @@ async function routeToTarget(target, targetId, text, opts = {}) {
 
   try {
     await chrome.tabs.update(targetTab.id, { active: true });
-    if (!backgroundMode) {
-      // Ping Pong deliberately does not steal focus from other windows.
+    // Grok's injection is document.execCommand, which is a silent no-op unless the
+    // document has focus. Ping Pong otherwise avoids stealing focus, but for Grok
+    // there is no choice: without this the composer stays empty, the send button is
+    // clicked anyway, and Grok answers an empty prompt every round.
+    const needsFocus = NEEDS_DOCUMENT_FOCUS.has(targetId);
+    if (!backgroundMode || needsFocus) {
       await chrome.windows.update(targetTab.windowId, { focused: true });
       await sleep(500);
     } else {
