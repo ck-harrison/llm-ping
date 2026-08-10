@@ -151,25 +151,55 @@ deleting the A≠B guard fails only that one.
   cooldown timing, double-load safety).
 - Packaging: 10 files, 124 KB, no internal paths. Both refusal paths exit 1.
 
-## NOT verified — needs a human at a browser
+## Verified in a real Chrome (2026-08-10)
 
-Nothing below has been run in Chrome. This is the honest gap in this session's
-work and it is the largest one:
+`node scripts/browser-check.js` installs the extension into a headless Chrome 151
+with a throwaway profile and asserts on what Chrome reports. 16 checks, all pass:
 
-1. **Load unpacked and confirm the extension boots.** `importScripts("shared.js")`
-   in the worker and the `shared.js` + `content.js` pair in `content_scripts` are
-   both new wiring.
-2. **Injection and capture on all five live sites.** Unchanged in method, but
-   `content.js` was restructured (single-load guard, one-pass DOM read).
-3. **A real Ping Pong session**, plus a deliberate stall (start one and never
-   answer) to confirm the watchdog ends it with a toast rather than hanging.
-4. **The permission removals.** `poe.com`, `chat.openai.com` and `activeTab` are
-   gone. Poe was never actually supported — it had a context menu entry, no
-   selectors and no content script. Removing `activeTab` should be covered by the
-   explicit `host_permissions`, but permission removal is exactly the kind of
-   "safe" change that isn't, so re-test the context menu and hotkeys on all five
-   sites.
-5. **The popup** — a hotkey-conflict warning line was added.
+- Chrome accepts the manifest — installs as LLM PingIt 3.4.0 UNPACKED with **no
+  manifest errors and no install warnings**, which also clears the permission
+  removals (`poe.com`, `chat.openai.com`, `activeTab`).
+- The **service worker starts**, runs `importScripts("shared.js")`, and reaches its
+  own code (`[LLM PingIt] Context menus created.`) with **zero exceptions**.
+- The **popup renders**: modes built from MODES, five targets, six hotkey rows with
+  correct defaults, rounds bounds derived from ROUND_LIMITS, shared.js present.
+- **Message plumbing over real `chrome.runtime`**: getChainState, getTranscript, and
+  both startChain rejections return exactly the expected payloads.
+
+Also confirmed by hand in the same browser, on a real `claude.ai` page (Cloudflare
+interstitial — no login needed for these):
+
+- The **content script injects** on a live matching host and answers `getStatus`.
+- The **HUD renders** bottom-left with the right text and buttons, and does not
+  collide with the toast bottom-right. Its Stop and Copy buttons message the
+  background correctly (Copy with no transcript gives the graceful toast).
+- **The P0 failure path works**: injecting into a page with no composer returns
+  `{ok:false, reason:"inject-and-clipboard-failed", error:"Claude input not found"}`
+  rather than claiming success. That is the exact bug that used to hang sessions.
+- **Re-injecting `shared.js` + `content.js` into a tab that already has them
+  succeeds with no error** — the single-load guard and the idempotent shared.js
+  wrapper hold in a real browser.
+- The worker **does terminate when idle**, which is why chainState is mirrored to
+  `storage.session`.
+
+**A real bug the browser found that nothing else could:** the Ping Pong mode
+dropdown clipped "Pass through" to "Pass throu" in its 100px select. Label is now
+"As-is", and browser-check measures every option's rendered width against the
+space the select gives it, so the next clipped label fails a check instead of
+needing a person to notice.
+
+## STILL not verified — needs your logged-in browser
+
+A throwaway profile has no accounts, so none of this can be reached automatically:
+
+1. **Injection into a real composer** on each of the five sites. The methods are
+   unchanged, but `content.js` was restructured (single-load guard, one-pass DOM
+   read, composer-clear detection).
+2. **Submission and response detection** — including whether the new
+   composer-clear check reports `submitted` correctly on each site.
+3. **A full Ping Pong session**, plus a deliberate stall (start one and never
+   answer) to confirm the watchdog ends it rather than hanging.
+4. **Context menu and hotkeys** against signed-in pages.
 
 ## Decisions settled
 

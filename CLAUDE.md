@@ -18,6 +18,8 @@ toast.css       → In-page styling: the toast (bottom right) and the Ping Pong 
 LICENSE         → MIT. Ships inside the store zip, as MIT requires of distributed copies
 scripts/gate.js → Quality gate. Prints denominators and what each check does not prove
 scripts/canary.sh  → Plants each gate check's own violation and asserts it goes red
+scripts/browser-check.js → Installs the extension in a real headless Chrome and
+                  asserts on what Chrome reports. Throwaway profile, no logins
 scripts/package.sh → Store zip from an explicit allowlist
 tests/          → node --test. shared.test.js covers the pure helpers;
                   boot.test.js evaluates background.js and content.js against
@@ -30,11 +32,18 @@ No build step. No bundler. No transpilation. No npm packages. Raw JS only.
 ## Commands
 
 ```bash
-node scripts/gate.js        # full quality gate — run before reporting anything done
-node --test                 # unit tests only (auto-discovers tests/)
-bash scripts/canary.sh      # prove every gate check can still fail
-bash scripts/package.sh     # build llm-pingit-<version>.zip for the Chrome Web Store
+node scripts/gate.js          # full quality gate — run before reporting anything done
+node --test                   # unit tests only (auto-discovers tests/)
+bash scripts/canary.sh        # prove every gate check can still fail
+node scripts/browser-check.js # install in a real Chrome and assert on it (~25s)
+bash scripts/package.sh       # build llm-pingit-<version>.zip for the Chrome Web Store
 ```
+
+`PINGIT_SCREENSHOT=/tmp/popup.png node scripts/browser-check.js` also writes a
+popup screenshot. Two Chrome facts baked into that script, both learned the hard
+way: `--load-extension` is ignored in current Chrome, and `Extensions.loadUnpacked`
+over CDP returns an id **without installing anything** unless the profile has
+developer mode enabled first.
 
 Start every session by reading `CHECKPOINT.md`; update it before the session ends.
 
@@ -149,7 +158,9 @@ Report each check explicitly. "All good" is not a gate result.
 
 **Never pin a canary's plant to a value that changes.** The Version sync plant was written as `s/^3\.3\.0$/9.9.9/`, so the first version bump made it a no-op — it planted nothing, the check stayed green, and `scripts/canary.sh` read that as the check passing its own test. Plants match patterns (`^\d+\.\d+\.\d+$`), not literals. `scripts/canary.sh` catches this class itself by treating a check that stays green as a failure, which is how this one surfaced.
 
-**What the gate cannot check, and a human must:** injection and capture against the five live sites, a real Ping Pong session end to end including a deliberate stall, and whether the popup still looks right.
+**What the gate cannot check.** `node scripts/browser-check.js` now covers part of what used to be listed here: Chrome accepting the manifest, the service worker starting and reaching its own code, the popup rendering (including a mechanical check that no dropdown label is clipped), and the message plumbing over real `chrome.runtime`.
+
+**What still needs a human, because a throwaway profile has no logins:** injection into a real composer on each of the five sites, submission, response detection, and a full Ping Pong session including a deliberate stall.
 
 ---
 

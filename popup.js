@@ -197,9 +197,11 @@ for (const [id, mode] of Object.entries(MODES)) {
   const opt = document.createElement("option");
   opt.value = id;
   // "Ask to critique" → "Critique": the dropdown is 100px wide and the verb is
-  // the only part that distinguishes the options.
+  // the only part that distinguishes the options. "As-is" rather than "Pass
+  // through" for the same reason — a browser screenshot showed the longer label
+  // clipped to "Pass throu". It also matches the context menu's "Send as-is".
   opt.textContent = id === "raw"
-    ? "Pass through"
+    ? "As-is"
     : mode.label.replace(/^Ask to /, "").replace(/^./, (c) => c.toUpperCase());
   chainMode.appendChild(opt);
 }

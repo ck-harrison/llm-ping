@@ -59,9 +59,11 @@ on a round number that will never advance.
 No build step, no dependencies.
 
 ```bash
-node scripts/gate.js        # quality gate: syntax, tests, parity, packaging safety
-node --test                 # unit tests
-bash scripts/package.sh     # build the store zip from an explicit allowlist
+node scripts/gate.js          # quality gate: syntax, tests, parity, packaging safety
+node --test                   # unit tests
+bash scripts/canary.sh        # prove every gate check can still fail
+node scripts/browser-check.js # install in a real headless Chrome and assert on it
+bash scripts/package.sh       # build the store zip from an explicit allowlist
 ```
 
 ## Privacy

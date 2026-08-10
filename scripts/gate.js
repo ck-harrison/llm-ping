@@ -357,13 +357,18 @@ check("No silently swallowed errors", () => {
   // names them in prose. Scanning those would report the ban as a violation of
   // itself — so scripts/gate.js is exempt by construction and the code patterns
   // are scoped to code.
+  // The tooling is held to the same rule as the extension — a test harness that
+  // swallows its own errors reports success it did not earn. scripts/gate.js and
+  // scripts/canary.sh are exempt by construction: one defines these patterns as
+  // regexes, the other plants them as strings.
+  const TOOLING_JS = ["scripts/browser-check.js"];
   const patterns = [
-    { re: /catch\s*(\([^)]*\))?\s*\{\s*\}/g, label: "empty catch block", files: SOURCE_JS },
-    { re: /\|\|\s*true\b/g, label: "|| true (always-true expression)", files: SOURCE_JS },
+    { re: /catch\s*(\([^)]*\))?\s*\{\s*\}/g, label: "empty catch block", files: [...SOURCE_JS, ...TOOLING_JS] },
+    { re: /\|\|\s*true\b/g, label: "|| true (always-true expression)", files: [...SOURCE_JS, ...TOOLING_JS] },
     // The pattern that made the previous gate unfailable: a suppressed
     // diagnostic. Checked in code, in the packaging script, and in the docs that
     // hand a command to a human — everywhere except this file's own definitions.
-    { re: /2>\s*\/dev\/null/g, label: "suppressed diagnostic output", files: [...SOURCE_JS, "scripts/package.sh", "CLAUDE.md", "README.md"] },
+    { re: /2>\s*\/dev\/null/g, label: "suppressed diagnostic output", files: [...SOURCE_JS, ...TOOLING_JS, "scripts/package.sh", "CLAUDE.md", "README.md"] },
   ];
 
   const scanned = new Set();
@@ -382,7 +387,7 @@ check("No silently swallowed errors", () => {
   return {
     ok: violations.length === 0,
     detail: `${scanned.size} files / ${linesScanned} lines scanned for 3 patterns, ${violations.length} violations${violations.length ? " — " + violations.join(", ") : ""}`,
-    notProven: "that errors which ARE caught are reported usefully — only that the catch block is not empty. scripts/gate.js is exempt: it contains every banned pattern as a regex literal",
+    notProven: "that errors which ARE caught are reported usefully — only that the catch block is not empty. scripts/gate.js and scripts/canary.sh are exempt: one holds every banned pattern as a regex, the other plants them deliberately",
   };
 });
 

@@ -13,7 +13,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-GUARDED=(shared.js background.js content.js popup.js popup.html manifest.json README.md CLAUDE.md scripts/package.sh)
+GUARDED=(shared.js background.js content.js popup.js popup.html manifest.json README.md CLAUDE.md scripts/package.sh scripts/browser-check.js)
 BACKUP=$(mktemp -d)
 mkdir -p "$BACKUP/scripts"
 for f in "${GUARDED[@]}"; do cp "$f" "$BACKUP/$f"; done
@@ -113,6 +113,10 @@ canary "Host surface parity" \
 canary "No silently swallowed errors" \
   "an empty catch block in shared.js" \
   "printf '\ntry { canaryNoop(); } catch (e) {}\n' >> shared.js"
+
+canary "No silently swallowed errors" \
+  "an empty catch block in the tooling, which is held to the same rule" \
+  "printf '\ntry { canaryNoop(); } catch (e) {}\n' >> scripts/browser-check.js"
 
 canary "Docs coverage" \
   "a README reference to a file that does not exist" \
