@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.6.0 ──
+// ── LLM PingIt – Background Service Worker v3.6.1 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -150,15 +150,28 @@ async function rehydrateChain() {
   }
   if (!saved) return;
 
-  // A session that had already stopped still carries why it stopped. Keeping it
-  // means the popup can explain itself after a worker restart instead of showing
-  // a blank status.
+  // A session that had already stopped still carries why it stopped AND its
+  // transcript. Rebuilding from only the reason threw the transcript away: the
+  // worker idles out after 30s, so anyone who read the conversation before pressing
+  // Copy transcript got an empty one. Everything the transcript needs to render
+  // itself is restored, not just the status line.
   if (!saved.active) {
     chainState = Object.assign(freshChainState(), {
+      llmA: saved.llmA || null,
+      llmB: saved.llmB || null,
+      mode: saved.mode || "raw",
+      maxRounds: saved.maxRounds || 5,
       currentRound: saved.currentRound || 0,
+      startedAt: saved.startedAt || null,
+      transcript: saved.transcript || [],
+      transcriptTruncated: !!saved.transcriptTruncated,
+      lastTextByTab: saved.lastTextByTab || {},
       stoppedReason: saved.stoppedReason || null,
       lastError: saved.lastError || null,
     });
+    if (chainState.transcript.length) {
+      console.log(`[LLM PingIt] Restored a finished session's transcript: ${chainState.transcript.length} responses`);
+    }
     return;
   }
 
@@ -665,6 +678,44 @@ function stopChain(reason) {
   persistChainState();
   if (wasActive) console.log(`[LLM PingIt] Ping Pong stopped: ${reason}`);
   broadcastChainState();
+  // Only "reached max rounds" arrives here just after recording a response. Every
+  // other ending — Stop, the watchdog, a failed bounce — leaves whatever is on
+  // screen unrecorded, because it was never classified as complete. Sweep for it.
+  if (wasActive) finalizeTranscript().catch((e) => console.error("[LLM PingIt] Transcript sweep failed:", e.message));
+}
+
+// Capture each chain tab's current last response and record anything not already
+// in the transcript. Runs after the session has stopped, so it can afford to be
+// slow and must never throw into its caller.
+async function finalizeTranscript() {
+  const tabs = [[chainState.tabA, chainState.llmA], [chainState.tabB, chainState.llmB]];
+  let added = 0;
+  for (const [tabId, targetId] of tabs) {
+    if (tabId == null || !targetId) continue;
+    let text = "";
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, { action: "getFullMessage" });
+      text = cleanText((response && response.text) || "");
+    } catch (e) {
+      console.log(`[LLM PingIt] Transcript sweep could not read the ${TARGETS[targetId]?.label} tab: ${e.message}`);
+      continue;
+    }
+    if (!text || text.length < MIN_USABLE_CHARS) continue;
+    // Already recorded, either as the response that ended the session or as this
+    // participant's most recent turn.
+    if (chainState.lastTextByTab[tabId] === text) continue;
+    const lastForTarget = [...chainState.transcript].reverse().find((e) => e.targetId === targetId);
+    if (lastForTarget && lastForTarget.text === text) continue;
+    appendTranscript(targetId, text);
+    chainState.lastTextByTab[tabId] = text;
+    added++;
+    console.log(`[LLM PingIt] Transcript sweep recorded a final ${TARGETS[targetId]?.label} response (${text.length} chars)`);
+  }
+  if (added > 0) {
+    persistChainState();
+    broadcastChainState();
+  }
+  console.log(`[LLM PingIt] Transcript sweep: 2 tabs checked, ${added} added, ${chainState.transcript.length} total`);
 }
 
 // ── Polling ────────────────────────────────────────────────────────────────

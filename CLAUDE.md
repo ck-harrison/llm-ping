@@ -93,6 +93,11 @@ The user then gets **Open fresh tabs & start** (opens a new-chat tab for anythin
 
 **Transcript:** every genuine response is appended to `chainState.transcript` *before* the round-limit check, so the final response of a session is included even though it is never bounced. Served by the `getTranscript` message to both the popup and the HUD.
 
+Two things the transcript needs beyond that, both learned from it losing entries:
+
+- **`finalizeTranscript()` sweeps both tabs when a session stops.** Only "reached max rounds" stops immediately after recording a response; Stop, the watchdog and a failed bounce all leave the answer on screen unrecorded, because it was never classified as complete. The sweep records anything not already there, deduped against `lastTextByTab` and the last entry for that participant.
+- **The non-active rehydrate must restore the transcript**, along with `llmA`/`llmB`/`mode`/`startedAt` — the header cannot render without them. The worker idles out 30s after a session ends, so restoring only the status line meant anyone who read the conversation before pressing Copy transcript got an empty one.
+
 ## Defensive Checks
 
 - **Duplicate:** `cleanText(text) === lastBouncedText` → skip, reset the tab to idle

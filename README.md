@@ -80,7 +80,7 @@ That puts the captured response on your system clipboard.
 
 ## Version
 
-3.6.0
+3.6.1
 
 ## License
 

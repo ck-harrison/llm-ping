@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.6.0 ──
+// ── LLM PingIt – Shared pure helpers v3.6.1 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)

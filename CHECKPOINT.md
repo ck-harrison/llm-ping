@@ -323,6 +323,26 @@ Also: the stall message now names who went quiet — "ChatGPT did not respond fo
 min (rate limit, or still thinking)" rather than "Stalled — no progress for 3 min",
 which was true and left nowhere to look.
 
+## v3.6.1 — the transcript was losing entries (2026-08-10)
+
+Reported: "not sure the transcript is catching the final entry on a long ping pong."
+Two separate bugs, both mine, and the "long" part is the tell for the first:
+
+1. **A finished session's transcript was thrown away on worker restart.** The
+   non-active rehydrate path rebuilt state from only `currentRound`,
+   `stoppedReason` and `lastError` — no transcript. The worker idles out 30s after a
+   session ends, so the longer you spend reading the conversation before pressing
+   Copy transcript, the more likely you got an empty one. Now restores the
+   transcript plus the fields its header needs (`llmA`, `llmB`, `mode`,
+   `startedAt`).
+2. **Only a max-rounds ending recorded the last answer.** Append happens when a
+   response is classified complete; Stop, the watchdog and a failed bounce all end a
+   session while the visible answer is still mid-flight, so it was never recorded.
+   `finalizeTranscript()` now sweeps both tabs on stop and records anything new,
+   deduped against `lastTextByTab` and the last entry for that participant.
+
+Both canaried: reverting either one fails its test.
+
 ## STILL not verified — needs your logged-in browser
 
 A throwaway profile has no accounts, and the two Cloudflare-gated sites cannot be

@@ -1,4 +1,4 @@
-// ── LLM PingIt – Popup v3.6.0 ──
+// ── LLM PingIt – Popup v3.6.1 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {

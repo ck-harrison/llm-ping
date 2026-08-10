@@ -43,7 +43,11 @@ function makeChromeStub(calls) {
     tabs: {
       onRemoved: event("tabs.onRemoved"),
       onUpdated: event("tabs.onUpdated"),
-      sendMessage: () => Promise.resolve({}),
+      sendMessage: (id, msg) => Promise.resolve(
+        msg && msg.action === "getFullMessage" && calls.tabText
+          ? { text: calls.tabText }
+          : {}
+      ),
       query: () => Promise.resolve(calls.tabs),
       get: (id) => {
         const t = calls.tabs.find((x) => x.id === id);
@@ -64,7 +68,10 @@ function makeChromeStub(calls) {
     },
     storage: {
       session: {
-        get: (defaults) => { calls.sessionGet++; return Promise.resolve(Object.assign({}, defaults)); },
+        get: (defaults) => {
+          calls.sessionGet++;
+          return Promise.resolve(calls.savedSession ? { chainState: calls.savedSession } : Object.assign({}, defaults));
+        },
         set: (obj) => { calls.sessionSet.push(obj); return Promise.resolve(); },
       },
       sync: {
@@ -80,8 +87,11 @@ function makeChromeStub(calls) {
   };
 }
 
-function bootBackground(tabs) {
-  const calls = { listeners: [], fns: {}, sessionGet: 0, sessionSet: [], menus: 0, tabs: tabs || [] };
+function bootBackground(tabs, extra) {
+  const calls = Object.assign(
+    { listeners: [], fns: {}, sessionGet: 0, sessionSet: [], menus: 0, tabs: tabs || [] },
+    extra || {}
+  );
   const sandbox = {
     console: { log() {}, error() {}, warn() {} },
     chrome: makeChromeStub(calls),
@@ -240,6 +250,60 @@ test("an unknown action gets an explicit answer, not a dead port", async () => {
   assert.equal(reply.ok, false);
   assert.equal(reply.code, "unknown-action");
   assert.match(reply.error, /Reload LLM PingIt/);
+});
+
+test("a finished session's transcript survives a worker restart", async () => {
+  // The worker idles out 30s after a session ends, so anyone who read the
+  // conversation before pressing Copy transcript used to get an empty one: the
+  // rehydrate path for a stopped session rebuilt state without the transcript.
+  const saved = {
+    active: false,
+    llmA: "claude", llmB: "chatgpt", mode: "critique",
+    maxRounds: 8, currentRound: 8,
+    startedAt: "2026-08-10 19:06",
+    stoppedReason: "Reached max rounds (8)",
+    transcript: [
+      { seq: 1, targetId: "claude", label: "Claude", text: "First answer from Claude." },
+      { seq: 2, targetId: "chatgpt", label: "ChatGPT", text: "Second answer from ChatGPT." },
+    ],
+    transcriptTruncated: false,
+    lastTextByTab: {},
+  };
+  const { calls } = bootBackground([], { savedSession: saved });
+  const result = await ask(calls, { action: "getTranscript" });
+  assert.equal(result.entries, 2, "the transcript must survive the restart");
+  assert.match(result.text, /First answer from Claude/);
+  assert.match(result.text, /Second answer from ChatGPT/);
+  // And the header still renders, which needs llmA/llmB/mode/startedAt too.
+  assert.match(result.text, /Claude ↔ ChatGPT/);
+  assert.match(result.text, /mode: Ask to critique/);
+
+  const state = await ask(calls, { action: "getChainState" });
+  assert.equal(state.transcriptEntries, 2);
+});
+
+test("stopping a session records the answer left on screen", async () => {
+  // Only "reached max rounds" stops just after recording a response. Stop, the
+  // watchdog and a failed bounce all used to leave the visible answer unrecorded.
+  const tabs = [
+    { id: 1, windowId: 1, url: "https://claude.ai/new", active: true },
+    { id: 2, windowId: 1, url: "https://chatgpt.com/", active: false },
+  ];
+  const { calls } = bootBackground(tabs, { tabText: "The last thing said before Stop was pressed." });
+
+  const started = await ask(calls, { action: "startChain", llmA: "claude", llmB: "chatgpt", maxRounds: 5 });
+  assert.equal(started.ok, true);
+
+  const before = await ask(calls, { action: "getTranscript" });
+  assert.equal(before.entries, 0, "nothing has completed yet");
+
+  await ask(calls, { action: "stopChain" });
+  await flush();
+  await flush();
+
+  const after = await ask(calls, { action: "getTranscript" });
+  assert.ok(after.entries > 0, "the sweep must record what was on screen");
+  assert.match(after.text, /The last thing said before Stop was pressed/);
 });
 
 test("onInstalled builds the context menus", () => {
