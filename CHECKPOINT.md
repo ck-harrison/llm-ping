@@ -188,18 +188,56 @@ dropdown clipped "Pass through" to "Pass throu" in its 100px select. Label is no
 space the select gives it, so the next clipped label fails a check instead of
 needing a person to notice.
 
+## Live-site test, logged out (2026-08-10)
+
+Which of the five are reachable at all without an account, from a clean headless
+Chrome. This is durable negative knowledge — do not re-explore it monthly:
+
+| Site | Logged out | Composer present |
+|---|---|---|
+| chatgpt.com | Cloudflare interstitial ("Just a moment...") | no |
+| claude.ai | Cloudflare interstitial | no |
+| copilot.microsoft.com | loads, but "Not available in your region" | yes, but dead |
+| grok.com | loads with Sign in / Sign up | **yes, visible** |
+| gemini.google.com | loads signed-out landing | **yes, visible** |
+
+So a full round cannot be completed without logins, but a real partial run was
+possible on Grok ↔ Gemini, and it verified three things no stub could:
+
+1. **Injection works on Grok's live composer.** `document.execCommand("insertText")`
+   put the question into the real page — the hard-won Grok method, confirmed
+   against the actual site rather than a fixture.
+2. **`clicked` / `submitted` reported the truth.** The result was
+   `{ok:true, clicked:true, submitted:false}`: the send button was clicked, and the
+   composer never cleared because a signed-out Grok will not accept the message.
+   The pre-v3.3.0 code would have reported success here and waited forever. This is
+   exactly the case the split was designed for, and it fired correctly on its first
+   contact with reality.
+3. **The stall watchdog ends a hung session.** Left running against that
+   never-submitting page, the chain stopped on its own at three minutes with
+   `stoppedReason: "Stalled — no progress for 3 min"`. That is the single most
+   important behaviour change in this whole rewrite, verified end to end.
+
+Also confirmed in the same run: tab B stays in the `waiting` phase and is never
+polled until bounced to, exactly as designed.
+
 ## STILL not verified — needs your logged-in browser
 
-A throwaway profile has no accounts, so none of this can be reached automatically:
+A throwaway profile has no accounts, and the two Cloudflare-gated sites cannot be
+reached at all, so this is what is left:
 
-1. **Injection into a real composer** on each of the five sites. The methods are
-   unchanged, but `content.js` was restructured (single-load guard, one-pass DOM
-   read, composer-clear detection).
-2. **Submission and response detection** — including whether the new
-   composer-clear check reports `submitted` correctly on each site.
-3. **A full Ping Pong session**, plus a deliberate stall (start one and never
-   answer) to confirm the watchdog ends it rather than hanging.
+1. **A response actually being generated and captured.** Everything up to the send
+   is verified; nothing downstream of it is. The response-detection state machine
+   has never seen a real streaming answer — only unit tests.
+2. **Injection on the other four composers.** Grok is confirmed live; Claude,
+   ChatGPT, Gemini and Copilot are unverified against a signed-in DOM.
+3. **A completed bounce** — capture, clean, inject into the second site, and the
+   round counter advancing.
 4. **Context menu and hotkeys** against signed-in pages.
+5. **`submitted: true`** has never been observed. Only the false case has been
+   seen, so the composer-clear detection is proven to report failure correctly but
+   not yet proven to recognise success. If it were wrong in that direction every
+   bounce would log an unverified-send warning while still working.
 
 ## Decisions settled
 
