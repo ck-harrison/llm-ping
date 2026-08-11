@@ -11,6 +11,7 @@ PingIt is a Chrome extension that sends AI responses between ChatGPT, Claude, Ge
 - **Modify mode** — Add instructions: Critique, Improve, Compare, or Expand
 - **Broadcast** — Send to all AIs simultaneously
 - **Ping Pong** — Two AIs debate autonomously (default 5 rounds, up to 50)
+- **Fresh-chat check** — Start verifies both AIs are open on new chats, and offers to open them for you
 - **Ping Pong modes** — Pass their answers through as-is, or make every round a critique, an improvement, a comparison, or an expansion
 - **In-page controls** — A round counter and a Stop button sit on both chain tabs, so you don't need the popup open to watch or stop a session
 - **Copy transcript** — Take the whole exchange out as Markdown, mid-session or after

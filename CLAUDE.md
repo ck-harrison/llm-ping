@@ -1,6 +1,6 @@
 # LLM PingIt
 
-Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,459 lines of shipping vanilla JS plus 1,219 in tests and tooling.
+Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,907 lines of shipping vanilla JS plus 1,911 in tests and tooling.
 
 ## Architecture
 
@@ -124,11 +124,11 @@ Hotkeys are implemented as a content-script keydown listener rather than `chrome
 ## Known Issues
 
 1. Grok "choose preferred response" — the self-echo check prevents bouncing the user's question, but the session stalls until the user picks manually. The watchdog now ends it after 3 minutes instead of hanging forever, naming who went quiet.
-2. Mid-response pauses > 4s (thinking, web search) may trigger a premature bounce.
+2. Mid-response pauses > 4s (thinking, web search) may trigger a premature bounce **on Grok only**. Elsewhere `isStillStreaming()` keeps the machine in the streaming phase through a pause; Grok has no trustworthy streaming element, so text stability is all there is.
 3. Capture ignores anything under `CAPTURE_MIN_CHARS` (3), and `MIN_USABLE_CHARS` (4) in background.js is the floor for a usable capture. A one- or two-character reply ("Ok") still stalls the session. These were 10 and 10, which discarded ordinary short answers entirely.
 4. All LLM selectors can break when platforms update their UI. Nothing mechanical can catch this — it needs a human on the live sites.
 5. The transcript starts at the first AI response — the opening prompt you type is never captured, because nothing reads the composer. `formatTranscript` says so in the output rather than letting it read as the whole conversation.
-6. A session over ~2 MB of captured text stops recording the transcript. The cap is recorded and reported in the output, not silently applied.
+6. A session over `TRANSCRIPT_LIMIT_CHARS` (500,000 characters, roughly 80,000 words) stops recording the transcript. The cap is recorded and reported in the output as INCOMPLETE, not silently applied.
 
 ## Reloading during development
 
@@ -170,7 +170,7 @@ None of `docs/`, this file, or `README.md` ships in the store package — `scrip
 
 ## Quality gate
 
-`node scripts/gate.js` — 12 mechanical checks. Every check prints its denominator (how many files, lines, or ids it examined) and states what it does not prove. Exit code is the result; do not report done on a red gate.
+`node scripts/gate.js` — 13 mechanical checks. Every check prints its denominator (how many files, lines, or ids it examined) and states what it does not prove. Exit code is the result; do not report done on a red gate.
 
 1. **Syntax** — `node -c` on all four JS files
 2. **Unit tests** — `node --test`; an empty suite is treated as a failure, not a pass
@@ -180,10 +180,11 @@ None of `docs/`, this file, or `README.md` ships in the store package — `scrip
 6. **Target registry parity** — five targets across five registries, including default hotkey *values*, not just keys
 7. **Script load order** — shared.js is evaluated before its consumers in all four load paths (content_scripts, importScripts, every executeScript injection, popup.html). Get this wrong and `cleanText` is undefined inside a callback: a runtime error no other check can see
 8. **Mode registry single source** — MODES only in shared.js, no second copy, every wrapper carries `{TEXT}`
-9. **Host surface parity** — host_permissions, content_scripts, MENU_URL_PATTERNS, TARGETS
-10. **No silently swallowed errors** — empty catch blocks, `|| true`, suppressed diagnostics
-11. **Docs coverage** — both directions: undocumented shipping files, and doc references that no longer exist
-12. **Package allowlist** — every shipping file named, no internal path listed
+9. **Watchdog keys on observable activity** — a wiring check: background.js must consult `hasObservableActivity`. The helper passes its own unit tests whether or not anything uses it, so deleting the one line that uses it broke no test
+10. **Host surface parity** — host_permissions, content_scripts, MENU_URL_PATTERNS, TARGETS. Also that every target has a `CHAT_URL_PATTERNS` entry, since one without would always read as a fresh chat
+11. **No silently swallowed errors** — empty catch blocks, `|| true`, suppressed diagnostics. Covers the tooling too; `scripts/gate.js` and `scripts/canary.sh` are exempt by construction, one holding every banned pattern as a regex and the other planting them deliberately
+12. **Docs coverage** — both directions: undocumented shipping files, and doc references that no longer exist
+13. **Package allowlist** — every shipping file named, no internal path listed
 
 Report each check explicitly. "All good" is not a gate result.
 
@@ -193,7 +194,9 @@ Report each check explicitly. "All good" is not a gate result.
 
 **What the gate cannot check.** `node scripts/browser-check.js` now covers part of what used to be listed here: Chrome accepting the manifest, the service worker starting and reaching its own code, the popup rendering (including a mechanical check that no dropdown label is clipped), and the message plumbing over real `chrome.runtime`.
 
-**What still needs a human, because a throwaway profile has no logins:** injection into a real composer on each of the five sites, submission, response detection, and a full Ping Pong session including a deliberate stall.
+`node scripts/browser-check.js` runs 19 checks against a real headless Chrome: the manifest installing without warnings, the worker starting and reaching its own code, the popup rendering (including that no dropdown label is clipped and that the header shows the running version), the preflight refusing to start with no tabs open, and message plumbing over real `chrome.runtime`.
+
+**What still needs a human, because a throwaway profile has no logins:** injection into a real composer on each of the five sites, submission, response detection, and a full Ping Pong session including a deliberate stall. Grok's injection *is* confirmed against the live site; the other four are not.
 
 ---
 

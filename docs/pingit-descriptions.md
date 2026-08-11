@@ -24,6 +24,8 @@ Right-click bounce — PingIt any response to another AI instantly.
 Highlight bounce — Select specific text, PingIt just that part.
 Modify mode — Add instructions: Critique, Improve, Compare, or Expand.
 Broadcast — Send to all AIs simultaneously.
+Fresh-chat check — Before a Ping Pong session starts, PingIt makes sure both AIs are open and on new chats, and offers to open them for you. Override it if you want to run on an existing conversation.
+In-page controls — A round counter, a Stop button and Copy transcript sit on both tabs, so you never have to hunt for the popup mid-session.
 Ping Pong — Start an autonomous conversation between two AIs. Watch them debate, iterate on code, or refine ideas without lifting a finger. Choose how each round is framed: pass through, critique, improve, compare, or expand.
 Copy transcript — Take the whole exchange out as Markdown, during a session or after it.
 Hotkeys — Ctrl+Shift+1 through 5 for each AI. Fully customizable.
@@ -135,7 +137,8 @@ What it does:
 - Highlight specific text → PingIt just that part
 - Keyboard shortcuts (Ctrl+Shift+1-5)
 - Broadcast to all AIs at once
-- Ping Pong: autonomous multi-turn AI-to-AI conversation
+- Ping Pong: autonomous multi-turn AI-to-AI conversation, with a mode per round (pass through, critique, improve, compare, expand)
+- Round counter and Stop button on the page itself, plus Copy transcript as Markdown
 
 Works with ChatGPT, Claude, Gemini, Copilot, and Grok. No API keys needed — it works with the free web interfaces.
 
@@ -159,7 +162,7 @@ PingIt is a Chrome extension (Manifest V3) that routes AI responses between Chat
 
 The interesting technical challenge was Ping Pong mode — autonomous multi-turn conversations between two AIs. The detection engine runs as a service worker polling every 1s with a state machine (idle → streaming → cooldown → complete) that watches for text stability. Each LLM has platform-specific quirks: Claude uses ProseMirror, Gemini uses Quill, Grok's React textarea only accepts document.execCommand, and Grok's submit button disabled state is not a streaming indicator (it's form validation — cost me two debugging sessions to find that).
 
-No API keys, no server, runs entirely client-side. ~2,050 lines of vanilla JS, no dependencies and no build step.
+No API keys, no server, runs entirely client-side. ~2,900 lines of vanilla JS, no dependencies and no build step.
 
 [link]
 ```
