@@ -26,10 +26,10 @@ const os = require("node:os");
 const path = require("node:path");
 
 const REPO = path.join(__dirname, "..");
-const PORT = process.env.PINGIT_CDP_PORT || 9333;
-const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), "pingit-chrome-"));
+const PORT = process.env.LLMPING_CDP_PORT || 9333;
+const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), "llm-ping-chrome-"));
 const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const SHOT = process.env.PINGIT_SCREENSHOT || null;
+const SHOT = process.env.LLMPING_SCREENSHOT || null;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
@@ -190,8 +190,8 @@ async function waitForCdp() {
 
   record("Service worker starts", swSession !== null,
     swSession ? "background.js is running" : "no service worker target — the worker never started");
-  record("Service worker reaches its own code", logs.some((l) => l.includes("[LLM PingIt]")),
-    logs.filter((l) => l.includes("[LLM PingIt]")).join(" / ") || "the extension logged nothing at all");
+  record("Service worker reaches its own code", logs.some((l) => l.includes("[LLM Ping]")),
+    logs.filter((l) => l.includes("[LLM Ping]")).join(" / ") || "the extension logged nothing at all");
   record("No exceptions on startup", errors.length === 0,
     errors.length ? errors.join(" | ") : "0 exceptions across the worker and popup");
 
@@ -318,7 +318,7 @@ function finish(browser) {
   cleanup();
 
   const pad = Math.max(...results.map((r) => r.name.length));
-  console.log("\nLLM PingIt browser check (real Chrome)\n" + "=".repeat(64) + "\n");
+  console.log("\nLLM Ping browser check (real Chrome)\n" + "=".repeat(64) + "\n");
   for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name.padEnd(pad)}  ${r.detail}`);
   const failed = results.filter((r) => !r.ok);
   console.log("\n" + "=".repeat(64));

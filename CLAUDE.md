@@ -1,4 +1,4 @@
-# LLM PingIt
+# LLM Ping
 
 Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,907 lines of shipping vanilla JS plus 1,911 in tests and tooling.
 
@@ -36,10 +36,10 @@ node scripts/gate.js          # full quality gate — run before reporting anyth
 node --test                   # unit tests only (auto-discovers tests/)
 bash scripts/canary.sh        # prove every gate check can still fail
 node scripts/browser-check.js # install in a real Chrome and assert on it (~25s)
-bash scripts/package.sh       # build llm-pingit-<version>.zip for the Chrome Web Store
+bash scripts/package.sh       # build llm-ping-<version>.zip for the Chrome Web Store
 ```
 
-`PINGIT_SCREENSHOT=/tmp/popup.png node scripts/browser-check.js` also writes a
+`LLMPING_SCREENSHOT=/tmp/popup.png node scripts/browser-check.js` also writes a
 popup screenshot. Two Chrome facts baked into that script, both learned the hard
 way: `--load-extension` is ignored in current Chrome, and `Extensions.loadUnpacked`
 over CDP returns an id **without installing anything** unless the profile has
@@ -47,7 +47,7 @@ developer mode enabled first.
 
 Start every session by reading `CHECKPOINT.md`; update it before the session ends.
 
-Testing: Load unpacked in Chrome, open LLM tabs, check the service worker console for `[LLM PingIt]` logs.
+Testing: Load unpacked in Chrome, open LLM tabs, check the service worker console for `[LLM Ping]` logs.
 
 ## Injection Methods — NEVER change without testing on live site
 
@@ -151,7 +151,7 @@ reload.
 
 ## Coding Conventions
 
-- All `console.log`/`warn`/`error` lines carry the `[LLM PingIt]` prefix. The gate checks every one.
+- All `console.log`/`warn`/`error` lines carry the `[LLM Ping]` prefix. The gate checks every one.
 - Version in manifest.json must stay in sync with README.md, this file, and the `// ── … vX.Y.Z ──` header of each JS file. The gate checks all seven places.
 - No external dependencies. No npm packages. No build tools.
 - Pure logic goes in `shared.js` so it can be tested; anything touching `chrome.*` or the DOM stays out of it.
@@ -160,9 +160,9 @@ reload.
 
 ## Docs
 
-- `docs/pingit-gtm-strategy.docx` — Go-to-market, competitive landscape, monetization, launch plan
-- `docs/pingit-technical-reference.docx` — Full anomaly catalog, state machine docs, debugging guide
-- `docs/pingit-descriptions.md` — Ready-to-use copy for Chrome Web Store, GitHub, X, Reddit, HN, Product Hunt
+- `docs/llm-ping-gtm-strategy.docx` — Go-to-market, competitive landscape, monetization, launch plan
+- `docs/llm-ping-technical-reference.docx` — Full anomaly catalog, state machine docs, debugging guide
+- `docs/llm-ping-descriptions.md` — Ready-to-use copy for Chrome Web Store, GitHub, X, Reddit, HN, Product Hunt
 
 None of `docs/`, this file, or `README.md` ships in the store package — `scripts/package.sh` refuses to include them.
 
@@ -174,7 +174,7 @@ None of `docs/`, this file, or `README.md` ships in the store package — `scrip
 
 1. **Syntax** — `node -c` on all four JS files
 2. **Unit tests** — `node --test`; an empty suite is treated as a failure, not a pass
-3. **Log prefix convention** — every console call carries `[LLM PingIt]`
+3. **Log prefix convention** — every console call carries `[LLM Ping]`
 4. **Version sync** — manifest vs README vs four file headers
 5. **No raw hex** outside popup.html and toast.css, whose domain is styling
 6. **Target registry parity** — five targets across five registries, including default hotkey *values*, not just keys

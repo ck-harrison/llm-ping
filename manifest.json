@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LLM PingIt",
+  "name": "LLM Ping",
   "version": "3.7.0",
   "description": "Ping responses between AI chatbots — bounce, broadcast, or start a Ping Pong conversation.",
   "minimum_chrome_version": "102",

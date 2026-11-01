@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// LLM PingIt quality gate. Run from the repo root: node scripts/gate.js
+// LLM Ping quality gate. Run from the repo root: node scripts/gate.js
 //
 // Two rules govern this file:
 //   1. Every check prints its DENOMINATOR — how many files, lines, or ids it
@@ -136,12 +136,12 @@ check("Log prefix convention", () => {
       // Only count the start of a console call, not continuation lines.
       if (!/\bconsole\.(log|warn|error)\s*\(/.test(line)) return;
       total++;
-      if (!line.includes("[LLM PingIt]")) violations.push(`${f}:${i + 1}`);
+      if (!line.includes("[LLM Ping]")) violations.push(`${f}:${i + 1}`);
     });
   }
   return {
     ok: violations.length === 0,
-    detail: `${total} console calls examined, ${violations.length} missing the [LLM PingIt] prefix${violations.length ? " — " + violations.join(", ") : ""}`,
+    detail: `${total} console calls examined, ${violations.length} missing the [LLM Ping] prefix${violations.length ? " — " + violations.join(", ") : ""}`,
     notProven: "that the messages are useful, or that a multi-line console call carries the prefix on its first line",
   };
 });
@@ -477,7 +477,7 @@ check("Package allowlist", () => {
 // ── report ─────────────────────────────────────────────────────────────────
 
 const pad = Math.max(...results.map((r) => r.name.length));
-console.log("\nLLM PingIt quality gate\n" + "=".repeat(60) + "\n");
+console.log("\nLLM Ping quality gate\n" + "=".repeat(60) + "\n");
 for (const r of results) {
   console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name.padEnd(pad)}  ${r.detail}`);
   console.log(`      ${" ".repeat(pad)}  does not prove: ${r.notProven}\n`);

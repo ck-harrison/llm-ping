@@ -67,7 +67,7 @@ canary "Unit tests" \
   "perl -pi -e 's/return currentRound < maxRounds;/return false;/' shared.js"
 
 canary "Log prefix convention" \
-  "a console.log with no [LLM PingIt] prefix" \
+  "a console.log with no [LLM Ping] prefix" \
   "printf '\nconsole.log(\"canary without a prefix\");\n' >> popup.js"
 
 # Matches whatever version README currently states rather than a pinned literal.

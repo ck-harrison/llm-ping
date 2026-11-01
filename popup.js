@@ -1,4 +1,4 @@
-// ── LLM PingIt – Popup v3.7.0 ──
+// ── LLM Ping – Popup v3.7.0 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {
@@ -255,7 +255,7 @@ function explainError(err, response, fallback) {
   if (response && response.error) return response.error;
   const message = (err && err.message) || "";
   if (/message port closed|Receiving end does not exist|Could not establish connection/i.test(message)) {
-    return "Reload the extension: open chrome://extensions, press \u21bb on LLM PingIt, then reload your AI tabs.";
+    return "Reload the extension: open chrome://extensions, press \u21bb on LLM Ping, then reload your AI tabs.";
   }
   return message || fallback;
 }

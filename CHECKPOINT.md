@@ -1,4 +1,4 @@
-# CHECKPOINT — LLM PingIt
+# CHECKPOINT — LLM Ping
 
 State of the world. Read this first; update it before the session ends.
 

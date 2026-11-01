@@ -35,7 +35,7 @@ test("shared.js loads twice into one realm without a redeclaration error", () =>
   const realm = vm.createContext({});
   vm.runInContext(src, realm);
   assert.equal(typeof realm.cleanText, "function", "first load installs the API");
-  assert.equal(realm.__pingitSharedLoaded, true);
+  assert.equal(realm.__llmPingSharedLoaded, true);
 
   vm.runInContext(src, realm);  // the injection that used to throw
   assert.equal(typeof realm.cleanText, "function", "API survives the second load");
@@ -207,7 +207,7 @@ test("formatTranscript renders a header, the pair, and every entry in order", ()
     { labelA: "Claude", labelB: "ChatGPT", rounds: 2, modeLabel: "Ask to critique", startedAt: "2026-08-10 18:00" },
     ENTRIES
   );
-  assert.match(out, /^# LLM PingIt — Claude ↔ ChatGPT/);
+  assert.match(out, /^# LLM Ping — Claude ↔ ChatGPT/);
   assert.match(out, /2 rounds · mode: Ask to critique · 2026-08-10 18:00/);
   assert.match(out, /## 1 · Claude/);
   assert.match(out, /## 2 · ChatGPT/);
@@ -235,7 +235,7 @@ test("formatTranscript says so when nothing was captured", () => {
 });
 
 test("formatTranscript pluralises rounds and survives missing metadata", () => {
-  assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /^# LLM PingIt — \? ↔ \?/);
+  assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /^# LLM Ping — \? ↔ \?/);
   assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /1 round(?! )/);
   assert.match(formatTranscript({ rounds: 2 }, ENTRIES), /2 rounds/);
   assert.doesNotThrow(() => formatTranscript(null, null));

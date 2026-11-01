@@ -249,7 +249,7 @@ test("an unknown action gets an explicit answer, not a dead port", async () => {
   assert.ok(reply, "the listener must respond to an action it does not know");
   assert.equal(reply.ok, false);
   assert.equal(reply.code, "unknown-action");
-  assert.match(reply.error, /Reload LLM PingIt/);
+  assert.match(reply.error, /Reload LLM Ping/);
 });
 
 test("a finished session's transcript survives a worker restart", async () => {
@@ -381,7 +381,7 @@ function bootContent(hostname, runTwice, opts) {
 
 test("content.js evaluates without throwing and binds its page listeners", () => {
   const { sandbox, calls, documentListeners } = bootContent("claude.ai");
-  assert.equal(sandbox.window.__pingitLoaded, true);
+  assert.equal(sandbox.window.__llmPingLoaded, true);
   for (const type of ["mousedown", "contextmenu", "keydown"]) {
     assert.ok(documentListeners.includes(type), `${type} listener was not bound`);
   }

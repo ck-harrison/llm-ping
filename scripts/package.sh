@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the Chrome Web Store zip from an explicit allowlist.
 #
-# The old command was `zip -r llm-pingit.zip . -x ".*"`, which shipped 16 entries
+# The old command was `zip -r llm-ping.zip . -x ".*"`, which shipped 16 entries
 # including the internal go-to-market strategy document and CLAUDE.md. A store
 # package is downloadable and unzippable by anyone, so the default must be
 # "nothing ships unless it is named here" rather than "everything ships unless it
@@ -29,7 +29,7 @@ FILES=(
 )
 
 VERSION=$(node -e 'process.stdout.write(require("./manifest.json").version)')
-OUT="llm-pingit-${VERSION}.zip"
+OUT="llm-ping-${VERSION}.zip"
 
 # Every named file must exist. A package that silently drops a file still zips.
 missing=()

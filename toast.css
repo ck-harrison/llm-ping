@@ -24,7 +24,7 @@
 
 /* Ping Pong HUD — bottom left, so it never sits on top of the toast (bottom
    right) or the composer. */
-#llm-pingit-hud {
+#llm-ping-hud {
   position: fixed;
   bottom: 24px;
   left: 24px;
@@ -45,16 +45,16 @@
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-#llm-pingit-hud.show {
+#llm-ping-hud.show {
   opacity: 1;
   transform: translateY(0);
 }
 
-#llm-pingit-hud .pingit-hud-text {
+#llm-ping-hud .llm-ping-hud-text {
   white-space: nowrap;
 }
 
-#llm-pingit-hud .pingit-hud-btn {
+#llm-ping-hud .llm-ping-hud-btn {
   background: #2a2a3e;
   color: #e0e0e0;
   border: 1px solid #444;
@@ -67,18 +67,18 @@
   cursor: pointer;
 }
 
-#llm-pingit-hud .pingit-hud-btn:hover {
+#llm-ping-hud .llm-ping-hud-btn:hover {
   background: #6C5CE7;
   border-color: #6C5CE7;
   color: #fff;
 }
 
-#llm-pingit-hud .pingit-hud-btn:disabled {
+#llm-ping-hud .llm-ping-hud-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-#llm-pingit-hud .pingit-hud-close {
+#llm-ping-hud .llm-ping-hud-close {
   padding: 4px 8px;
   font-size: 14px;
 }

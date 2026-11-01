@@ -1,13 +1,13 @@
-# 🏓 LLM PingIt
+# 🏓 LLM Ping
 
 Right-click. Hotkey. Bounce between AI chatbots in seconds.
 
-PingIt is a Chrome extension that sends AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with one click. Its standout feature — **Ping Pong** — starts an autonomous multi-turn conversation between two AIs. No API keys, no accounts, no server. Everything runs locally in your browser.
+LLM Ping is a Chrome extension that sends AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with one click. Its standout feature — **Ping Pong** — starts an autonomous multi-turn conversation between two AIs. No API keys, no accounts, no server. Everything runs locally in your browser.
 
 ## Features
 
-- **Right-click bounce** — PingIt any response to another AI instantly
-- **Highlight bounce** — Select specific text, PingIt just that part
+- **Right-click bounce** — Ping any response to another AI instantly
+- **Highlight bounce** — Select specific text, ping just that part
 - **Modify mode** — Add instructions: Critique, Improve, Compare, or Expand
 - **Broadcast** — Send to all AIs simultaneously
 - **Ping Pong** — Two AIs debate autonomously (default 5 rounds, up to 50)
@@ -38,7 +38,7 @@ PingIt is a Chrome extension that sends AI responses between ChatGPT, Claude, Ge
 
 ## How Ping Pong Works
 
-1. Open the PingIt popup
+1. Open the LLM Ping popup
 2. Select two AIs (e.g., Grok ↔ Gemini)
 3. Pick a mode — as-is, critique, improve, compare, or expand
 4. Set rounds (default: 5)
@@ -73,9 +73,9 @@ bash scripts/package.sh       # build the store zip from an explicit allowlist
 
 ## Privacy
 
-PingIt runs entirely in your browser. No data leaves your machine. No analytics. No tracking. No server.
+LLM Ping runs entirely in your browser. No data leaves your machine. No analytics. No tracking. No server.
 
-The one thing worth knowing: when injection into a target site fails, PingIt
+The one thing worth knowing: when injection into a target site fails, LLM Ping
 falls back to copying the text to your clipboard so you can paste it yourself.
 That puts the captured response on your system clipboard.
 

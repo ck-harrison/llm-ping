@@ -1,4 +1,4 @@
-// ── LLM PingIt – Background Service Worker v3.7.0 ──
+// ── LLM Ping – Background Service Worker v3.7.0 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -67,7 +67,7 @@ function appendTranscript(targetId, text) {
   if (used + text.length > TRANSCRIPT_LIMIT_CHARS) {
     if (!chainState.transcriptTruncated) {
       chainState.transcriptTruncated = true;
-      console.log(`[LLM PingIt] Transcript limit (${TRANSCRIPT_LIMIT_CHARS} chars) reached after ${chainState.transcript.length} responses — later ones are not recorded`);
+      console.log(`[LLM Ping] Transcript limit (${TRANSCRIPT_LIMIT_CHARS} chars) reached after ${chainState.transcript.length} responses — later ones are not recorded`);
     }
     return;
   }
@@ -102,7 +102,7 @@ const MIN_USABLE_CHARS = 4;
 // firing. Bound it and name the reason.
 function recordSkip(what) {
   chainState.consecutiveSkips++;
-  console.log(`[LLM PingIt] Skip ${chainState.consecutiveSkips}/${MAX_CONSECUTIVE_SKIPS}: ${what}`);
+  console.log(`[LLM Ping] Skip ${chainState.consecutiveSkips}/${MAX_CONSECUTIVE_SKIPS}: ${what}`);
   return chainState.consecutiveSkips >= MAX_CONSECUTIVE_SKIPS;
 }
 
@@ -116,7 +116,7 @@ let chainState = freshChainState();
 // not. session storage is cleared when the browser closes, which is correct here.
 function persistChainState() {
   chrome.storage.session.set({ chainState }).catch((e) => {
-    console.error("[LLM PingIt] Could not persist chain state:", e.message);
+    console.error("[LLM Ping] Could not persist chain state:", e.message);
   });
 }
 
@@ -133,7 +133,7 @@ const ready = new Promise((resolve) => { markReady = resolve; });
   try {
     await rehydrateChain();
   } catch (e) {
-    console.error("[LLM PingIt] Rehydration failed:", e.message);
+    console.error("[LLM Ping] Rehydration failed:", e.message);
   } finally {
     markReady();
   }
@@ -145,7 +145,7 @@ async function rehydrateChain() {
     const stored = await chrome.storage.session.get({ chainState: null });
     saved = stored.chainState;
   } catch (e) {
-    console.error("[LLM PingIt] Could not read persisted chain state:", e.message);
+    console.error("[LLM Ping] Could not read persisted chain state:", e.message);
     return;
   }
   if (!saved) return;
@@ -170,7 +170,7 @@ async function rehydrateChain() {
       lastError: saved.lastError || null,
     });
     if (chainState.transcript.length) {
-      console.log(`[LLM PingIt] Restored a finished session's transcript: ${chainState.transcript.length} responses`);
+      console.log(`[LLM Ping] Restored a finished session's transcript: ${chainState.transcript.length} responses`);
     }
     return;
   }
@@ -180,14 +180,14 @@ async function rehydrateChain() {
     chainState = freshChainState();
     chainState.currentRound = saved.currentRound || 0;
     chainState.lastError = "Ping Pong ended — a chain tab was closed while the extension was asleep.";
-    console.log("[LLM PingIt] " + chainState.lastError);
+    console.log("[LLM Ping] " + chainState.lastError);
     persistChainState();
     broadcastChainState();
     return;
   }
 
   chainState = Object.assign(freshChainState(), saved, { bouncing: false, lastProgressAt: Date.now() });
-  console.log(`[LLM PingIt] Service worker restarted mid-session — resuming Ping Pong at round ${chainState.currentRound}/${chainState.maxRounds}`);
+  console.log(`[LLM Ping] Service worker restarted mid-session — resuming Ping Pong at round ${chainState.currentRound}/${chainState.maxRounds}`);
   await startBackgroundPolling();
   broadcastChainState();
   await notifyTab(chainState.tabA, "🏓 Ping Pong resumed after extension restart");
@@ -217,7 +217,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "llm-bounce",
-      title: "PingIt",
+      title: "LLM Ping",
       contexts: ["all"],
       documentUrlPatterns: MENU_URL_PATTERNS,
     });
@@ -261,7 +261,7 @@ chrome.runtime.onInstalled.addListener(() => {
       });
     }
 
-    console.log("[LLM PingIt] Context menus created.");
+    console.log("[LLM Ping] Context menus created.");
   });
 });
 
@@ -288,7 +288,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const target = TARGETS[targetId];
     const mode = MODES[modeId];
     if (!target || !mode) {
-      console.error(`[LLM PingIt] Unparseable menu id: ${id} (target=${targetId}, mode=${modeId})`);
+      console.error(`[LLM Ping] Unparseable menu id: ${id} (target=${targetId}, mode=${modeId})`);
       return;
     }
     const textToSend = await captureText(info, tab);
@@ -320,7 +320,7 @@ async function broadcastTo(text, sourceTab) {
     .filter(([tid]) => broadcast[tid] !== false && tid !== sourceTargetId);
 
   if (enabled.length === 0) {
-    await notifyTab(sourceTab?.id, "⚠️ No broadcast targets enabled. Click the LLM PingIt icon to configure.");
+    await notifyTab(sourceTab?.id, "⚠️ No broadcast targets enabled. Click the LLM Ping icon to configure.");
     return;
   }
 
@@ -335,14 +335,14 @@ async function broadcastTo(text, sourceTab) {
       else failed.push(`${target.label} (${result.reason})`);
     } catch (e) {
       failed.push(`${target.label} (${e.message})`);
-      console.error(`[LLM PingIt] Broadcast to ${target.label} failed:`, e);
+      console.error(`[LLM Ping] Broadcast to ${target.label} failed:`, e);
     }
     // Space out the tab switches, but not after the last one.
     if (index < enabled.length - 1) await sleep(1000);
   }
 
   // Attempted vs succeeded vs failed, never one number where three are true.
-  console.log(`[LLM PingIt] Broadcast: attempted ${enabled.length}, sent ${sent.length}, failed ${failed.length}${failed.length ? " — " + failed.join(", ") : ""}`);
+  console.log(`[LLM Ping] Broadcast: attempted ${enabled.length}, sent ${sent.length}, failed ${failed.length}${failed.length ? " — " + failed.join(", ") : ""}`);
   if (failed.length > 0) {
     await notifyTab(sourceTab?.id, `⚠️ Broadcast: ${sent.length} sent, ${failed.length} failed (${failed.join(", ")})`);
   }
@@ -357,7 +357,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     startChain(msg)
       .then((result) => sendResponse(result))
       .catch((e) => {
-        console.error("[LLM PingIt] startChain threw:", e);
+        console.error("[LLM Ping] startChain threw:", e);
         sendResponse({ ok: false, error: e.message });
       });
     return true;
@@ -403,7 +403,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     handleHotkeyBounce(msg, sender)
       .then((result) => sendResponse(result))
       .catch((e) => {
-        console.error("[LLM PingIt] hotkeyBounce failed:", e);
+        console.error("[LLM Ping] hotkeyBounce failed:", e);
         sendResponse({ ok: false, error: e.message });
       });
     return true;
@@ -416,11 +416,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // worker and send an action it has never heard of. Falling off the end of this
   // listener without responding produces Chrome's "The message port closed before
   // a response was received", which says nothing about what to do about it.
-  console.log(`[LLM PingIt] Unknown action "${msg && msg.action}" — this build does not handle it; the extension probably needs reloading`);
+  console.log(`[LLM Ping] Unknown action "${msg && msg.action}" — this build does not handle it; the extension probably needs reloading`);
   sendResponse({
     ok: false,
     code: "unknown-action",
-    error: `The running extension does not support "${msg && msg.action}". Reload LLM PingIt at chrome://extensions, then reload your AI tabs.`,
+    error: `The running extension does not support "${msg && msg.action}". Reload LLM Ping at chrome://extensions, then reload your AI tabs.`,
   });
   return false;
 });
@@ -524,12 +524,12 @@ async function preflightChain({ llmA, llmB, windowId }) {
         const status = await chrome.tabs.sendMessage(tab.id, { action: "getStatus" });
         entry.messages = status ? status.msgCount : null;
       } catch (e) {
-        console.log(`[LLM PingIt] Preflight could not read the ${entry.label} tab: ${e.message}`);
+        console.log(`[LLM Ping] Preflight could not read the ${entry.label} tab: ${e.message}`);
       }
     }
     results.push(entry);
   }
-  console.log("[LLM PingIt] Preflight: " + results.map((r) =>
+  console.log("[LLM Ping] Preflight: " + results.map((r) =>
     `${r.label}=${!r.hasTab ? "no tab" : (r.fresh ? "fresh" : "existing chat")}${r.messages ? ` (${r.messages} msgs)` : ""}`).join(", "));
   return { ok: true, results };
 }
@@ -545,14 +545,14 @@ async function openFreshTabs({ targetIds, windowId }) {
       await waitForTabLoad(tab.id);
       await sleep(1500);
       opened[id] = tab.id;
-      console.log(`[LLM PingIt] Opened a fresh ${target.label} tab (${tab.id})`);
+      console.log(`[LLM Ping] Opened a fresh ${target.label} tab (${tab.id})`);
     } catch (e) {
       failed.push(`${target.label} (${e.message})`);
-      console.error(`[LLM PingIt] Could not open a ${target.label} tab:`, e.message);
+      console.error(`[LLM Ping] Could not open a ${target.label} tab:`, e.message);
     }
   }
   // Attempted vs opened vs failed, not one number for three facts.
-  console.log(`[LLM PingIt] Fresh tabs: attempted ${(targetIds || []).length}, opened ${Object.keys(opened).length}, failed ${failed.length}`);
+  console.log(`[LLM Ping] Fresh tabs: attempted ${(targetIds || []).length}, opened ${Object.keys(opened).length}, failed ${failed.length}`);
   if (failed.length) return { ok: false, error: `Could not open: ${failed.join(", ")}`, opened };
   return { ok: true, opened };
 }
@@ -570,7 +570,7 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
 
   const rounds = clampRounds(maxRounds, MIN_ROUNDS, MAX_ROUNDS);
   const modeId = MODES[mode] ? mode : "raw";
-  if (mode && !MODES[mode]) console.log(`[LLM PingIt] Unknown mode "${mode}", falling back to raw`);
+  if (mode && !MODES[mode]) console.log(`[LLM Ping] Unknown mode "${mode}", falling back to raw`);
 
   // Explicit tab ids win when the caller has just opened fresh tabs — re-resolving
   // by host match would find the stale tab that prompted opening a new one.
@@ -591,7 +591,7 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
     if (!aTab) missing.push(TARGETS[llmA].label);
     if (!bTab) missing.push(TARGETS[llmB].label);
     const error = `No open tab for ${missing.join(" or ")}. Open one and try again.`;
-    console.error("[LLM PingIt] " + error);
+    console.error("[LLM Ping] " + error);
     chainState = freshChainState();
     chainState.lastError = error;
     persistChainState();
@@ -609,7 +609,7 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
     if (!isFreshChatUrl(llmB, bTab.url)) stale.push(TARGETS[llmB].label);
     if (stale.length > 0) {
       const error = `${stale.join(" and ")} ${stale.length > 1 ? "are" : "is"} on an existing chat.`;
-      console.log("[LLM PingIt] " + error + " Refusing to start without an override.");
+      console.log("[LLM Ping] " + error + " Refusing to start without an override.");
       chainState = freshChainState();
       chainState.lastError = error;
       persistChainState();
@@ -644,7 +644,7 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
       const status = await chrome.tabs.sendMessage(tabId, { action: "getStatus" });
       if (!status) unreachable.push(TARGETS[id].label);
     } catch (e) {
-      console.error(`[LLM PingIt] ${id} tab ${tabId} did not answer getStatus:`, e.message);
+      console.error(`[LLM Ping] ${id} tab ${tabId} did not answer getStatus:`, e.message);
       unreachable.push(TARGETS[id].label);
     }
   }
@@ -657,7 +657,7 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
     return { ok: false, error };
   }
 
-  console.log(`[LLM PingIt] Ping Pong started: ${llmA} (tab ${aTab.id}) <-> ${llmB} (tab ${bTab.id}), max ${rounds} rounds, mode: ${chainState.mode}`);
+  console.log(`[LLM Ping] Ping Pong started: ${llmA} (tab ${aTab.id}) <-> ${llmB} (tab ${bTab.id}), max ${rounds} rounds, mode: ${chainState.mode}`);
 
   await startBackgroundPolling();
   persistChainState();
@@ -676,12 +676,12 @@ function stopChain(reason) {
   chainState.stoppedReason = reason;
   stopBackgroundPolling();
   persistChainState();
-  if (wasActive) console.log(`[LLM PingIt] Ping Pong stopped: ${reason}`);
+  if (wasActive) console.log(`[LLM Ping] Ping Pong stopped: ${reason}`);
   broadcastChainState();
   // Only "reached max rounds" arrives here just after recording a response. Every
   // other ending — Stop, the watchdog, a failed bounce — leaves whatever is on
   // screen unrecorded, because it was never classified as complete. Sweep for it.
-  if (wasActive) finalizeTranscript().catch((e) => console.error("[LLM PingIt] Transcript sweep failed:", e.message));
+  if (wasActive) finalizeTranscript().catch((e) => console.error("[LLM Ping] Transcript sweep failed:", e.message));
 }
 
 // Capture each chain tab's current last response and record anything not already
@@ -697,7 +697,7 @@ async function finalizeTranscript() {
       const response = await chrome.tabs.sendMessage(tabId, { action: "getFullMessage" });
       text = cleanText((response && response.text) || "");
     } catch (e) {
-      console.log(`[LLM PingIt] Transcript sweep could not read the ${TARGETS[targetId]?.label} tab: ${e.message}`);
+      console.log(`[LLM Ping] Transcript sweep could not read the ${TARGETS[targetId]?.label} tab: ${e.message}`);
       continue;
     }
     if (!text || text.length < MIN_USABLE_CHARS) continue;
@@ -709,13 +709,13 @@ async function finalizeTranscript() {
     appendTranscript(targetId, text);
     chainState.lastTextByTab[tabId] = text;
     added++;
-    console.log(`[LLM PingIt] Transcript sweep recorded a final ${TARGETS[targetId]?.label} response (${text.length} chars)`);
+    console.log(`[LLM Ping] Transcript sweep recorded a final ${TARGETS[targetId]?.label} response (${text.length} chars)`);
   }
   if (added > 0) {
     persistChainState();
     broadcastChainState();
   }
-  console.log(`[LLM PingIt] Transcript sweep: 2 tabs checked, ${added} added, ${chainState.transcript.length} total`);
+  console.log(`[LLM Ping] Transcript sweep: 2 tabs checked, ${added} added, ${chainState.transcript.length} total`);
 }
 
 // ── Polling ────────────────────────────────────────────────────────────────
@@ -782,10 +782,10 @@ async function initPollState(tabId) {
       bgPollState[tabId].msgCount = result.msgCount || 0;
       bgPollState[tabId].baselineText = result.lastText || "";
       bgPollState[tabId].lastTextLen = (result.lastText || "").length;
-      console.log(`[LLM PingIt] Init poll ${targetIdForTab(tabId)}: msgs=${bgPollState[tabId].msgCount}, textLen=${bgPollState[tabId].lastTextLen}`);
+      console.log(`[LLM Ping] Init poll ${targetIdForTab(tabId)}: msgs=${bgPollState[tabId].msgCount}, textLen=${bgPollState[tabId].lastTextLen}`);
     }
   } catch (e) {
-    console.log("[LLM PingIt] initPollState failed for tab", tabId, e.message);
+    console.log("[LLM Ping] initPollState failed for tab", tabId, e.message);
   }
 }
 
@@ -828,7 +828,7 @@ async function pollTab(tabId, pollCount) {
   };
 
   if (pollCount <= 10 || pollCount % 5 === 0) {
-    console.log(`[LLM PingIt] BgPoll#${pollCount} ${targetId}: msgs=${obs.msgCount}(was ${state.msgCount}) streaming=${obs.streaming} phase=${state.phase} txtLen=${obs.text.length}`);
+    console.log(`[LLM Ping] BgPoll#${pollCount} ${targetId}: msgs=${obs.msgCount}(was ${state.msgCount}) streaming=${obs.streaming} phase=${state.phase} txtLen=${obs.text.length}`);
   }
 
   const now = Date.now();
@@ -845,15 +845,15 @@ async function pollTab(tabId, pollCount) {
   if (advanced.event) {
     chainState.lastProgressAt = now;
     if (advanced.event === "started") {
-      console.log(`[LLM PingIt] ${targetId}: response STARTED (msgs=${obs.msgCount}, streaming=${obs.streaming})`);
+      console.log(`[LLM Ping] ${targetId}: response STARTED (msgs=${obs.msgCount}, streaming=${obs.streaming})`);
     } else if (advanced.event === "cooldown") {
-      console.log(`[LLM PingIt] ${targetId}: text stable, entering cooldown (len=${obs.text.length})`);
+      console.log(`[LLM Ping] ${targetId}: text stable, entering cooldown (len=${obs.text.length})`);
     } else if (advanced.event === "resumed") {
-      console.log(`[LLM PingIt] ${targetId}: change during cooldown, back to streaming`);
+      console.log(`[LLM Ping] ${targetId}: change during cooldown, back to streaming`);
     } else if (advanced.event === "complete" || advanced.event === "complete-short") {
       const secs = Math.round((now - (advanced.state.streamStartTime || now)) / 1000);
       const via = advanced.event === "complete-short" ? " via the short-reply path" : "";
-      console.log(`[LLM PingIt] ${targetId}: RESPONSE COMPLETE${via} (len=${obs.text.length}, total ${secs}s)`);
+      console.log(`[LLM Ping] ${targetId}: RESPONSE COMPLETE${via} (len=${obs.text.length}, total ${secs}s)`);
       await handleResponseComplete(tabId);
     }
   }
@@ -865,7 +865,7 @@ async function handlePollFailure(tabId, targetId, message) {
   const state = bgPollState[tabId];
   if (!state) return;
   state.failures = (state.failures || 0) + 1;
-  console.log(`[LLM PingIt] Poll failure ${state.failures}/${MAX_POLL_FAILURES} on ${targetId} (tab ${tabId}): ${message}`);
+  console.log(`[LLM Ping] Poll failure ${state.failures}/${MAX_POLL_FAILURES} on ${targetId} (tab ${tabId}): ${message}`);
 
   if (message && message.includes("Receiving end does not exist")) {
     await injectContentScript(tabId);
@@ -901,7 +901,7 @@ async function resetTabToIdle(tabId) {
     });
   } catch (e) {
     bgPollState[tabId] = newPollState(phase);
-    console.log(`[LLM PingIt] resetTabToIdle: could not read tab ${tabId}, reset blind:`, e.message);
+    console.log(`[LLM Ping] resetTabToIdle: could not read tab ${tabId}, reset blind:`, e.message);
   }
 }
 
@@ -918,11 +918,11 @@ async function handleResponseComplete(senderTabId) {
   // only as long as no second tab of the same site existed.
   const senderTargetId = targetIdForTab(senderTabId);
   if (!senderTargetId) {
-    console.log(`[LLM PingIt] handleResponseComplete from tab ${senderTabId}, which is not in the chain — ignoring`);
+    console.log(`[LLM Ping] handleResponseComplete from tab ${senderTabId}, which is not in the chain — ignoring`);
     return;
   }
 
-  console.log(`[LLM PingIt] handleResponseComplete from ${senderTargetId} (tab ${senderTabId})`);
+  console.log(`[LLM Ping] handleResponseComplete from ${senderTargetId} (tab ${senderTabId})`);
 
   let text = "";
   try {
@@ -932,23 +932,23 @@ async function handleResponseComplete(senderTabId) {
     // element looks identical to a correct one in a byte count — a real session
     // bounced Grok's static greeting for eight rounds and the log said only
     // "Fetched 33 chars", which was true and useless.
-    console.log(`[LLM PingIt] Captured ${text.length} chars from ${senderTargetId}: "${text.slice(0, 100).replace(/\s+/g, " ")}${text.length > 100 ? "…" : ""}"`);
+    console.log(`[LLM Ping] Captured ${text.length} chars from ${senderTargetId}: "${text.slice(0, 100).replace(/\s+/g, " ")}${text.length > 100 ? "…" : ""}"`);
   } catch (e) {
-    console.error(`[LLM PingIt] Failed to fetch text from ${senderTargetId}:`, e.message);
+    console.error(`[LLM Ping] Failed to fetch text from ${senderTargetId}:`, e.message);
     await resetTabToIdle(senderTabId);
     return;
   }
 
   if (!text || text.length < MIN_USABLE_CHARS) {
-    console.log(`[LLM PingIt] Text too short (${text.length} chars), checking for an image-only response...`);
+    console.log(`[LLM Ping] Text too short (${text.length} chars), checking for an image-only response...`);
     try {
       const imgResponse = await sendMessageToTab(senderTabId, { action: "getImageFallback" });
       if (imgResponse?.text) {
         text = imgResponse.text;
-        console.log(`[LLM PingIt] Using image fallback: ${text.length} chars`);
+        console.log(`[LLM Ping] Using image fallback: ${text.length} chars`);
       }
     } catch (e) {
-      console.log("[LLM PingIt] Image fallback check failed:", e.message);
+      console.log("[LLM Ping] Image fallback check failed:", e.message);
     }
     if (!text || text.length < MIN_USABLE_CHARS) {
       const giveUp = recordSkip(`no usable content from ${senderTargetId}`);
@@ -1013,7 +1013,7 @@ async function handleResponseComplete(senderTabId) {
   const mode = MODES[chainState.mode] || MODES.raw;
   const finalText = applyWrapper(mode.wrapper, cleanedText);
 
-  console.log(`[LLM PingIt] === Round ${roundNumber}/${chainState.maxRounds} === ${senderTargetId} → ${nextTargetId}, ${finalText.length} chars`);
+  console.log(`[LLM Ping] === Round ${roundNumber}/${chainState.maxRounds} === ${senderTargetId} → ${nextTargetId}, ${finalText.length} chars`);
   await notifyTab(senderTabId, `🔄 Round ${roundNumber}/${chainState.maxRounds} — sending to ${nextTarget.label}...`);
 
   chainState.bouncing = true;
@@ -1046,7 +1046,7 @@ async function handleResponseComplete(senderTabId) {
     return;
   }
   if (!result.submitted) {
-    console.log(`[LLM PingIt] Send to ${nextTargetId} is UNVERIFIED — clicked, but the composer did not clear. Continuing; the watchdog will catch it if nothing comes back.`);
+    console.log(`[LLM Ping] Send to ${nextTargetId} is UNVERIFIED — clicked, but the composer did not clear. Continuing; the watchdog will catch it if nothing comes back.`);
   }
 
   chainState.currentRound = roundNumber;
@@ -1063,7 +1063,7 @@ async function handleResponseComplete(senderTabId) {
   chainState.bouncing = false;
   persistChainState();
   broadcastChainState();
-  console.log(`[LLM PingIt] Bounce complete, waiting for ${nextTargetId}...`);
+  console.log(`[LLM Ping] Bounce complete, waiting for ${nextTargetId}...`);
 }
 
 // ── Chain tab lifecycle ────────────────────────────────────────────────────
@@ -1083,7 +1083,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (!bgPollState[tabId]) return;
   // A reload resets the page's message count to zero; without clearing the
   // baseline the poller would wait for a count it will never see again.
-  console.log(`[LLM PingIt] Chain tab ${tabId} (${targetIdForTab(tabId)}) is navigating — resetting its poll baseline`);
+  console.log(`[LLM Ping] Chain tab ${tabId} (${targetIdForTab(tabId)}) is navigating — resetting its poll baseline`);
   const phase = bgPollState[tabId].phase === "waiting" ? "waiting" : "idle";
   bgPollState[tabId] = newPollState(phase);
   chainState.lastProgressAt = Date.now();
@@ -1095,7 +1095,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 
 async function captureText(info, tab) {
   if (!tab || tab.id == null) {
-    console.error("[LLM PingIt] captureText: no tab in context menu click");
+    console.error("[LLM Ping] captureText: no tab in context menu click");
     return null;
   }
 
@@ -1109,7 +1109,7 @@ async function captureText(info, tab) {
       const response = await sendMessageToTab(tab.id, { action: "getFullMessage" });
       if (response && response.text) textToSend = response.text;
     } catch (e) {
-      console.error("[LLM PingIt] Failed to get full message:", e.message);
+      console.error("[LLM Ping] Failed to get full message:", e.message);
     }
   }
 
@@ -1137,7 +1137,7 @@ async function injectContentScript(tabId) {
     await sleep(300);
     return true;
   } catch (e) {
-    console.log("[LLM PingIt] Could not inject into tab", tabId, e.message);
+    console.log("[LLM Ping] Could not inject into tab", tabId, e.message);
     return false;
   }
 }
@@ -1149,7 +1149,7 @@ async function sendMessageToTab(tabId, message) {
   try {
     return await chrome.tabs.sendMessage(tabId, message);
   } catch (e) {
-    console.log("[LLM PingIt] sendMessage failed, injecting content script:", e.message);
+    console.log("[LLM Ping] sendMessage failed, injecting content script:", e.message);
     await injectContentScript(tabId);
     return await chrome.tabs.sendMessage(tabId, message);
   }
@@ -1201,7 +1201,7 @@ async function routeToTarget(target, targetId, text, opts = {}) {
       await sleep(300);
     }
   } catch (e) {
-    console.log("[LLM PingIt] Could not focus tab", targetTab.id, e.message);
+    console.log("[LLM Ping] Could not focus tab", targetTab.id, e.message);
   }
 
   let autoSubmit = forceAutoSubmit;
@@ -1210,7 +1210,7 @@ async function routeToTarget(target, targetId, text, opts = {}) {
     autoSubmit = stored.autoSubmit;
   }
 
-  console.log(`[LLM PingIt] Injecting ${text.length} chars into ${targetId} (tab ${targetTab.id}, bg=${backgroundMode}, autoSubmit=${autoSubmit})`);
+  console.log(`[LLM Ping] Injecting ${text.length} chars into ${targetId} (tab ${targetTab.id}, bg=${backgroundMode}, autoSubmit=${autoSubmit})`);
 
   let response = null;
   try {
@@ -1218,7 +1218,7 @@ async function routeToTarget(target, targetId, text, opts = {}) {
       action: "injectText", text, target: targetId, autoSubmit,
     });
   } catch (e) {
-    console.error("[LLM PingIt] Could not reach the content script to inject:", e.message);
+    console.error("[LLM Ping] Could not reach the content script to inject:", e.message);
     await clipboardFallback(targetTab.id, text);
     return { ok: false, reason: "content-script-unreachable", tabId: targetTab.id };
   }
@@ -1226,9 +1226,9 @@ async function routeToTarget(target, targetId, text, opts = {}) {
   if (!response) return { ok: false, reason: "no-response-from-content-script", tabId: targetTab.id };
 
   if (response.ok) {
-    console.log(`[LLM PingIt] Injection successful into ${targetId} (submitted=${response.submitted})`);
+    console.log(`[LLM Ping] Injection successful into ${targetId} (submitted=${response.submitted})`);
   } else {
-    console.error(`[LLM PingIt] Injection into ${targetId} failed: ${response.reason} ${response.error || ""}`);
+    console.error(`[LLM Ping] Injection into ${targetId} failed: ${response.reason} ${response.error || ""}`);
   }
   return Object.assign({ tabId: targetTab.id }, response);
 }
@@ -1250,7 +1250,7 @@ async function clipboardFallback(tabId, text) {
       args: [text],
     });
   } catch (e) {
-    console.error("[LLM PingIt] Clipboard fallback failed for tab", tabId, e.message);
+    console.error("[LLM Ping] Clipboard fallback failed for tab", tabId, e.message);
   }
 }
 
@@ -1281,7 +1281,7 @@ async function notifyTab(tabId, message) {
       args: [message],
     });
   } catch (e2) {
-    console.log("[LLM PingIt] Could not show toast in tab", tabId, e2.message);
+    console.log("[LLM Ping] Could not show toast in tab", tabId, e2.message);
   }
 }
 
@@ -1293,7 +1293,7 @@ function waitForTabLoad(tabId) {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
-      console.log("[LLM PingIt] waitForTabLoad timed out for tab", tabId);
+      console.log("[LLM Ping] waitForTabLoad timed out for tab", tabId);
       resolve();
     }, 15000);
     const listener = (id, changeInfo) => {

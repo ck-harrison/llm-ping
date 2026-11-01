@@ -1,4 +1,4 @@
-// ── LLM PingIt – Shared pure helpers v3.7.0 ──
+// ── LLM Ping – Shared pure helpers v3.7.0 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -23,8 +23,8 @@
     module.exports = factory();
     return;
   }
-  if (root.__pingitSharedLoaded) return;
-  root.__pingitSharedLoaded = true;
+  if (root.__llmPingSharedLoaded) return;
+  root.__llmPingSharedLoaded = true;
   var api = factory();
   for (var key in api) root[key] = api[key];
 })(typeof globalThis !== "undefined" ? globalThis : self, function () {
@@ -89,7 +89,7 @@
     meta = meta || {};
     entries = entries || [];
     var lines = [];
-    lines.push("# LLM PingIt — " + (meta.labelA || "?") + " ↔ " + (meta.labelB || "?"));
+    lines.push("# LLM Ping — " + (meta.labelA || "?") + " ↔ " + (meta.labelB || "?"));
 
     var bits = [];
     var rounds = meta.rounds || 0;

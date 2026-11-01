@@ -1,4 +1,4 @@
-# LLM PingIt — Descriptions & Copy
+# LLM Ping — Descriptions & Copy
 
 ---
 
@@ -6,7 +6,7 @@
 
 ### Title (45 char max)
 ```
-PingIt — Bounce Between AI Chatbots Instantly
+LLM Ping — Bounce Between AI Chatbots Instantly
 ```
 
 ### Short Description (132 char max)
@@ -16,15 +16,15 @@ Right-click any AI response to bounce it to ChatGPT, Claude, Gemini, Copilot, or
 
 ### Full Description
 ```
-PingIt lets you bounce AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with a single right-click or keyboard shortcut.
+LLM Ping lets you bounce AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with a single right-click or keyboard shortcut.
 
 FEATURES
 
-Right-click bounce — PingIt any response to another AI instantly.
-Highlight bounce — Select specific text, PingIt just that part.
+Right-click bounce — Ping any response to another AI instantly.
+Highlight bounce — Select specific text, ping just that part.
 Modify mode — Add instructions: Critique, Improve, Compare, or Expand.
 Broadcast — Send to all AIs simultaneously.
-Fresh-chat check — Before a Ping Pong session starts, PingIt makes sure both AIs are open and on new chats, and offers to open them for you. Override it if you want to run on an existing conversation.
+Fresh-chat check — Before a Ping Pong session starts, LLM Ping makes sure both AIs are open and on new chats, and offers to open them for you. Override it if you want to run on an existing conversation.
 In-page controls — A round counter, a Stop button and Copy transcript sit on both tabs, so you never have to hunt for the popup mid-session.
 Ping Pong — Start an autonomous conversation between two AIs. Watch them debate, iterate on code, or refine ideas without lifting a finger. Choose how each round is framed: pass through, critique, improve, compare, or expand.
 Copy transcript — Take the whole exchange out as Markdown, during a session or after it.
@@ -34,7 +34,7 @@ HOW IT WORKS
 
 1. Open two or more AI tabs (ChatGPT, Claude, Gemini, Copilot, Grok)
 2. Get a response from any AI
-3. Right-click → PingIt to another AI
+3. Right-click → Ping to another AI
 4. Or start Ping Pong and watch two AIs go back and forth automatically
 
 No API keys. No accounts. No subscriptions. Works with the free web interfaces you already use.
@@ -47,13 +47,13 @@ SUPPORTED AIs
 • Copilot (copilot.microsoft.com)
 • Grok (grok.com)
 
-WHY PINGIT
+WHY LLMPING
 
-You already have multiple AI tabs open. You already copy-paste between them. PingIt removes the friction. And Ping Pong mode does something no other tool can — it makes two AIs talk to each other.
+You already have multiple AI tabs open. You already copy-paste between them. LLM Ping removes the friction. And Ping Pong mode does something no other tool can — it makes two AIs talk to each other.
 
 PRIVACY
 
-PingIt runs entirely in your browser. No data leaves your machine. No analytics. No tracking. No server.
+LLM Ping runs entirely in your browser. No data leaves your machine. No analytics. No tracking. No server.
 ```
 
 ---
@@ -72,7 +72,7 @@ Right-click. Hotkey. Bounce between AI chatbots in seconds.
 
 ### README Intro Paragraph
 ```
-PingIt is a Chrome extension that lets you send AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with one click. Its standout feature — Ping Pong — starts an autonomous multi-turn conversation between two AIs. No API keys, no accounts, no server. Everything runs locally in your browser.
+LLM Ping is a Chrome extension that lets you send AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with one click. Its standout feature — Ping Pong — starts an autonomous multi-turn conversation between two AIs. No API keys, no accounts, no server. Everything runs locally in your browser.
 ```
 
 ---
@@ -134,7 +134,7 @@ The feature that surprised me: Ping Pong mode. You pick two AIs, give them a top
 
 What it does:
 - Right-click any AI response → send it to another AI
-- Highlight specific text → PingIt just that part
+- Highlight specific text → ping just that part
 - Keyboard shortcuts (Ctrl+Shift+1-5)
 - Broadcast to all AIs at once
 - Ping Pong: autonomous multi-turn AI-to-AI conversation, with a mode per round (pass through, critique, improve, compare, expand)
@@ -153,12 +153,12 @@ Would love feedback. What AI pairs have you found give the most interesting resu
 
 ### Show HN Title
 ```
-Show HN: PingIt – Bounce responses between AI chatbots with right-click or hotkey
+Show HN: LLM Ping – Bounce responses between AI chatbots with right-click or hotkey
 ```
 
 ### Show HN Body
 ```
-PingIt is a Chrome extension (Manifest V3) that routes AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok.
+LLM Ping is a Chrome extension (Manifest V3) that routes AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok.
 
 The interesting technical challenge was Ping Pong mode — autonomous multi-turn conversations between two AIs. The detection engine runs as a service worker polling every 1s with a state machine (idle → streaming → cooldown → complete) that watches for text stability. Each LLM has platform-specific quirks: Claude uses ProseMirror, Gemini uses Quill, Grok's React textarea only accepts document.execCommand, and Grok's submit button disabled state is not a streaming indicator (it's form validation — cost me two debugging sessions to find that).
 
@@ -178,7 +178,7 @@ Make AI chatbots talk to each other with one click
 
 ### Description
 ```
-PingIt bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok.
+LLM Ping bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok.
 
 Right-click any response to send it to another AI. Or start Ping Pong mode — two AIs debate, iterate, and refine ideas autonomously.
 
@@ -187,7 +187,7 @@ No API keys. No accounts. Free Chrome extension that works with the web interfac
 
 ### Maker Comment
 ```
-I built PingIt because I was tired of copy-pasting between AI tabs. The tool I couldn't find anywhere: something that lets two AIs talk to each other automatically.
+I built LLM Ping because I was tired of copy-pasting between AI tabs. The tool I couldn't find anywhere: something that lets two AIs talk to each other automatically.
 
 Ping Pong mode is the feature I'm most excited about. Pick any two AIs, give them a topic, and watch them go. I've used it for code reviews (ChatGPT writes, Claude critiques), strategy brainstorming (Gemini and Grok build on each other), and debate prep.
 
@@ -202,14 +202,14 @@ Happy to answer any questions about the architecture or what AI pairs work best 
 
 ### Subject
 ```
-PingIt: Chrome extension that makes AI chatbots debate each other
+LLM Ping: Chrome extension that makes AI chatbots debate each other
 ```
 
 ### Body
 ```
 Hi [name],
 
-I built a Chrome extension called PingIt that lets you bounce AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with one right-click.
+I built a Chrome extension called LLM Ping that lets you bounce AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with one right-click.
 
 The feature your readers would find interesting: Ping Pong mode. You pick two AIs, type a question, and they go back and forth automatically — debating, iterating, and building on each other's responses. No copy-paste, no tab switching.
 
@@ -234,5 +234,5 @@ Right-click any AI response → send it to another AI instantly. Or let two AIs 
 
 The missing feature for people with 5 AI tabs open: one-click cross-AI response routing.
 
-Stop copy-pasting between AI chatbots. PingIt does it with a right-click.
+Stop copy-pasting between AI chatbots. LLM Ping does it with a right-click.
 ```

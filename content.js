@@ -1,4 +1,4 @@
-// ── LLM PingIt – Content Script v3.7.0 ──
+// ── LLM Ping – Content Script v3.7.0 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //
@@ -9,10 +9,10 @@
 // removed.
 
 (function () {
-  if (window.__pingitLoaded) return;
-  window.__pingitLoaded = true;
+  if (window.__llmPingLoaded) return;
+  window.__llmPingLoaded = true;
 
-  console.log("[LLM PingIt] Content script loaded on", window.location.hostname);
+  console.log("[LLM Ping] Content script loaded on", window.location.hostname);
 
   var IS_GROK = window.location.hostname.indexOf("grok.com") !== -1;
 
@@ -42,13 +42,13 @@
 
   chrome.storage.sync.get({ hotkeys: null }, function (data) {
     hotkeys = data.hotkeys || DEFAULT_HOTKEYS;
-    console.log("[LLM PingIt] Hotkeys loaded:", JSON.stringify(hotkeys));
+    console.log("[LLM Ping] Hotkeys loaded:", JSON.stringify(hotkeys));
   });
 
   chrome.storage.onChanged.addListener(function (changes) {
     if (changes.hotkeys) {
       hotkeys = changes.hotkeys.newValue || DEFAULT_HOTKEYS;
-      console.log("[LLM PingIt] Hotkeys updated");
+      console.log("[LLM Ping] Hotkeys updated");
     }
   });
 
@@ -85,13 +85,13 @@
         if (text) text = cleanText(text);
       }
       if (!text || text.length < 5) {
-        showToast("⚠️ No text selected or found to PingIt");
+        showToast("⚠️ No text selected or found to ping");
         return;
       }
 
-      console.log("[LLM PingIt] Hotkey: " + targetId + " (" + text.length + " chars)");
+      console.log("[LLM Ping] Hotkey: " + targetId + " (" + text.length + " chars)");
       chrome.runtime.sendMessage({ action: "hotkeyBounce", targetId: targetId, text: text });
-      showToast("🏓 PingIt → " + (targetId === "broadcast" ? "All" : targetId));
+      showToast("🏓 Ping → " + (targetId === "broadcast" ? "All" : targetId));
       return;
     }
   }, true);
@@ -163,13 +163,13 @@
 
   function buildHud() {
     var el = document.createElement("div");
-    el.id = "llm-pingit-hud";
+    el.id = "llm-ping-hud";
 
     hudText = document.createElement("span");
-    hudText.className = "pingit-hud-text";
+    hudText.className = "llm-ping-hud-text";
 
     hudStop = document.createElement("button");
-    hudStop.className = "pingit-hud-btn";
+    hudStop.className = "llm-ping-hud-btn";
     hudStop.textContent = "Stop";
     hudStop.addEventListener("click", function () {
       hudStop.disabled = true;
@@ -179,12 +179,12 @@
     });
 
     hudCopy = document.createElement("button");
-    hudCopy.className = "pingit-hud-btn";
+    hudCopy.className = "llm-ping-hud-btn";
     hudCopy.textContent = "Copy transcript";
     hudCopy.addEventListener("click", copyTranscript);
 
     var close = document.createElement("button");
-    close.className = "pingit-hud-btn pingit-hud-close";
+    close.className = "llm-ping-hud-btn llm-ping-hud-close";
     close.textContent = "×";
     close.title = "Hide";
     close.addEventListener("click", removeHud);
@@ -239,7 +239,7 @@
       navigator.clipboard.writeText(res.text).then(function () {
         showToast("📋 Transcript copied — " + res.entries + " responses" + (res.truncated ? " (incomplete)" : ""));
       }).catch(function (e) {
-        console.log("[LLM PingIt] Clipboard write failed:", e && e.message);
+        console.log("[LLM Ping] Clipboard write failed:", e && e.message);
         showToast("⚠️ Could not copy — try the Copy transcript button in the popup");
       });
     });
@@ -293,7 +293,7 @@
         var el = document.querySelector(sels[i]);
         if (el && el.offsetParent !== null) return true;
       } catch (e) {
-        console.log("[LLM PingIt] streaming selector failed:", sels[i], e.message);
+        console.log("[LLM Ping] streaming selector failed:", sels[i], e.message);
       }
     }
     return false;
@@ -346,7 +346,7 @@
       try {
         els = document.querySelectorAll(selectors[i]);
       } catch (e) {
-        console.log("[LLM PingIt] selector failed:", selectors[i], e.message);
+        console.log("[LLM Ping] selector failed:", selectors[i], e.message);
         continue;
       }
 
@@ -400,7 +400,7 @@
           if (images.length > 0) break;
         }
       } catch (e) {
-        console.log("[LLM PingIt] image fallback selector failed:", selectors[i], e.message);
+        console.log("[LLM Ping] image fallback selector failed:", selectors[i], e.message);
       }
     }
 
@@ -426,7 +426,7 @@
           if (matched.length > 10) return cleanText(matched);
         }
       } catch (e) {
-        console.log("[LLM PingIt] closest() failed:", selectors[i], e.message);
+        console.log("[LLM Ping] closest() failed:", selectors[i], e.message);
       }
     }
 
@@ -486,7 +486,7 @@
       // killing a working session over whitespace would be worse than the warning.
       var wanted = text.replace(/\s+/g, " ").trim().slice(0, 40);
       if (wanted && landed.replace(/\s+/g, " ").indexOf(wanted) === -1) {
-        console.log("[LLM PingIt] Composer text does not match what was injected — continuing, but the send may be wrong");
+        console.log("[LLM Ping] Composer text does not match what was injected — continuing, but the send may be wrong");
       }
 
       if (!autoSubmit) {
@@ -496,7 +496,7 @@
       return sleep(300)
         .then(function () { return clickSendButton(target); })
         .then(function (result) {
-          showToast(result.clicked ? "✅ PingIt sent!" : "✅ Message loaded — press Enter");
+          showToast(result.clicked ? "✅ Ping sent!" : "✅ Message loaded — press Enter");
           return { ok: true, clicked: result.clicked, submitted: result.submitted, autoSubmit: true };
         });
     }).catch(function (err) {
@@ -504,7 +504,7 @@
       // successfully after falling back to the clipboard, so the background
       // script believed every injection landed and Ping Pong waited forever
       // for a response that was never going to be generated.
-      console.error("[LLM PingIt] Injection failed:", err);
+      console.error("[LLM Ping] Injection failed:", err);
       return navigator.clipboard.writeText(text).then(function () {
         showToast("📋 Copied to clipboard — paste with Ctrl+V");
         return { ok: false, reason: "clipboard-fallback", error: err && err.message };
@@ -575,7 +575,7 @@
           var btn = document.querySelector(sels[i]);
           if (btn && !btn.disabled) { btn.click(); return true; }
         } catch (e) {
-          console.log("[LLM PingIt] send selector failed:", sels[i], e.message);
+          console.log("[LLM Ping] send selector failed:", sels[i], e.message);
         }
       }
       return false;
@@ -596,7 +596,7 @@
             return Promise.resolve(true);
           }
         } catch (e) {
-          console.log("[LLM PingIt] Enter fallback failed:", e.message);
+          console.log("[LLM Ping] Enter fallback failed:", e.message);
         }
         return Promise.resolve(false);
       }
@@ -611,7 +611,7 @@
       // composer late would otherwise kill a session that is working fine.
       return waitForComposerToClear(composer, before, 1500).then(function (cleared) {
         if (!cleared) {
-          console.log("[LLM PingIt] Send button clicked but the composer still holds the text — send is unverified");
+          console.log("[LLM Ping] Send button clicked but the composer still holds the text — send is unverified");
         }
         return { clicked: true, submitted: cleared };
       });
@@ -643,18 +643,18 @@
     for (var i = 0; i < allBtns.length; i++) {
       var btnText = (allBtns[i].textContent || "").trim();
       if (btnText === "Skip" && allBtns[i].offsetParent !== null) {
-        console.log("[LLM PingIt] Dismissing Claude widget via Skip button");
+        console.log("[LLM Ping] Dismissing Claude widget via Skip button");
         allBtns[i].click();
         return sleep(1500);
       }
     }
     var closeBtn = document.querySelector('button[aria-label*="close"], button[aria-label*="Close"], button[aria-label*="dismiss"]');
     if (closeBtn && closeBtn.offsetParent !== null) {
-      console.log("[LLM PingIt] Dismissing Claude widget via close button");
+      console.log("[LLM Ping] Dismissing Claude widget via close button");
       closeBtn.click();
       return sleep(1500);
     }
-    console.log("[LLM PingIt] Trying Escape to dismiss Claude widget");
+    console.log("[LLM Ping] Trying Escape to dismiss Claude widget");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     return sleep(1500);
   }
