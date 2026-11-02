@@ -1,6 +1,6 @@
 # LLM Ping
 
-Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,907 lines of shipping vanilla JS plus 1,911 in tests and tooling.
+Chrome extension (Manifest V3) that bounces AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok. Killer feature: **Ping Pong** — autonomous multi-turn AI-to-AI conversations. No API keys, no server, 2,978 lines of shipping vanilla JS plus 2,080 in tests and tooling.
 
 ## Architecture
 
@@ -16,6 +16,11 @@ popup.html/js   → Popup UI: Ping Pong controls, hotkey settings, broadcast con
 toast.css       → In-page styling: the toast (bottom right) and the Ping Pong HUD
                   (bottom left). The only place raw colour values are allowed
 LICENSE         → MIT. Ships inside the store zip, as MIT requires of distributed copies
+icons/icon.svg  → Source for the three icon PNGs: two chat bubbles (purple, coral) and a
+                  ball, on a navy tile. Original artwork; the old icon was an emoji-style
+                  paddle of unknown origin. Does not ship; the PNGs do
+scripts/make-icons.sh → Renders icon.svg to icon16/48/128.png. 128 keeps the store's
+                  16px padding; 16 and 48 use a tighter crop so the toolbar icon is legible
 scripts/gate.js → Quality gate. Prints denominators and what each check does not prove
 scripts/canary.sh  → Plants each gate check's own violation and asserts it goes red
 scripts/browser-check.js → Installs the extension in a real headless Chrome and
@@ -53,18 +58,22 @@ Testing: Load unpacked in Chrome, open LLM tabs, check the service worker consol
 
 Each LLM has a unique editor. The injection method was discovered through trial and error. Do not "improve" these.
 
+Last verified against the signed-in live sites on 2026-11-02 (v3.8.0), by a hotkey bounce into each site and a 6-round Claude ↔ Copilot Ping Pong.
+
 - **Claude:** ProseMirror contenteditable → create `<p>`, clear innerHTML, append, dispatch input
-- **ChatGPT:** contenteditable `#prompt-textarea` → set innerHTML with `<p>`, dispatch input
+- **ChatGPT:** ProseMirror contenteditable (no id since Nov 2026; `#prompt-textarea` is gone, the generic fallback finds it) → set innerHTML with `<p>`, dispatch input
 - **Gemini:** Quill `.ql-editor` → clear innerHTML, create `<p>`, dispatch input
-- **Copilot:** standard textarea → `setNativeValue()` + React change event
-- **Grok:** React controlled textarea → `document.execCommand('insertText')` ONLY method that works
+- **Copilot:** since Nov 2026 a **Lexical** editor on **copilot.com** (copilot.microsoft.com redirects there) → `pasteIntoEditor`: select all, wait for Lexical to see the selection, dispatch a synthetic `paste` with a DataTransfer. Lexical ignores innerHTML/innerText writes and input events. The old textarea + `setNativeValue()` path stays as a fallback
+- **Grok:** since Nov 2026 a **tiptap** (ProseMirror) editor → the same `pasteIntoEditor`. A textarea is still in the DOM but **hidden**, so the composer readback must not look at it. The old textarea + `execCommand('insertText')` path stays as a fallback for the previous UI
+
+**Answer selectors that changed in Nov 2026:** ChatGPT answers are `[data-content-search-unit-key$=':assistant']` and start "ChatGPT said:" (stripped by `cleanText`); Copilot answers are `[data-testid='markdown-reply']`; Grok chat URLs are `/c/<id>`. Grok captures now carry a "Grok" label, source chips (U+2060 + name) and a trailing "N sources", all stripped by `cleanText`.
 
 ## Grok Rules — HARD-WON, DO NOT REVERT
 
 1. `isStillStreaming()` returns `false` for Grok via an **early return keyed on the hostname**, before the generic stop-button selector list runs. This must stay an early return. It was previously a comment at the bottom of the function while the generic selectors ran for every host, so the rule held only because none of the eight selectors happened to match Grok's DOM. Why the rule exists: no DOM element reliably indicates streaming; submit-button-disabled is form validation, not streaming; `.thinking-container` persists after Think mode with "Thought for Xs". Both caused infinite streaming loops.
 2. User vs assistant messages: same `.message-bubble` class. Distinguish via parent `alignItems`: `flex-end` = user, `flex-start` = assistant. The result is cached in a WeakMap — `getComputedStyle` forces a style recalc and this runs once a second.
-3. Text injection: `document.execCommand('insertText')` after selectAll+delete, 100ms delay.
-4. **`execCommand` is a silent no-op unless the document has focus.** So Ping Pong *must* focus the window when the target is Grok, even though it otherwise avoids stealing focus — see `NEEDS_DOCUMENT_FOCUS` in background.js. Without it the composer stays empty, the send button is clicked anyway, and Grok answers an empty prompt. This was found in the field: an 8-round session where Grok replied "Hello! How can I help you today?" every single time while Gemini dutifully critiqued the greeting. Gemini was unaffected because its injection writes to the DOM directly and needs no focus.
+3. Text injection: since Nov 2026, a synthetic paste into the tiptap editor (see Injection Methods). The previous UI's method, `document.execCommand('insertText')` after selectAll+delete with a 100ms delay, is kept as the fallback.
+4. **`execCommand` is a silent no-op unless the document has focus.** Whether the new paste path also needs focus is untested; `NEEDS_DOCUMENT_FOCUS` still focuses Grok, which is the safe side. So Ping Pong *must* focus the window when the target is Grok, even though it otherwise avoids stealing focus — see `NEEDS_DOCUMENT_FOCUS` in background.js. Without it the composer stays empty, the send button is clicked anyway, and Grok answers an empty prompt. This was found in the field: an 8-round session where Grok replied "Hello! How can I help you today?" every single time while Gemini dutifully critiqued the greeting. Gemini was unaffected because its injection writes to the DOM directly and needs no focus.
 
 ## Ping Pong State Machine
 
@@ -163,6 +172,9 @@ reload.
 - `docs/llm-ping-gtm-strategy.docx` — Go-to-market, competitive landscape, monetization, launch plan
 - `docs/llm-ping-technical-reference.docx` — Full anomaly catalog, state machine docs, debugging guide
 - `docs/llm-ping-descriptions.md` — Ready-to-use copy for Chrome Web Store, GitHub, X, Reddit, HN, Product Hunt
+- `docs/images/` — screenshots used by the README
+
+**Public pages, in the Personal-Site repo, not this one:** `~/Code/Personal-Site/public/llm-ping-help.html` (the user guide at ckharrison.xyz/llm-ping-help.html, linked from the popup's Instructions panel and the README) and `~/Code/Personal-Site/public/llm-ping-privacy.html` (the store's privacy policy URL), with images in `~/Code/Personal-Site/public/llm-ping/`. When behaviour, menus, hotkeys or limits change, update the help page, the popup's Instructions panel and the README together: they describe the same things.
 
 None of `docs/`, this file, or `README.md` ships in the store package — `scripts/package.sh` refuses to include them.
 
@@ -196,16 +208,4 @@ Report each check explicitly. "All good" is not a gate result.
 
 `node scripts/browser-check.js` runs 19 checks against a real headless Chrome: the manifest installing without warnings, the worker starting and reaching its own code, the popup rendering (including that no dropdown label is clipped and that the header shows the running version), the preflight refusing to start with no tabs open, and message plumbing over real `chrome.runtime`.
 
-**What still needs a human, because a throwaway profile has no logins:** injection into a real composer on each of the five sites, submission, response detection, and a full Ping Pong session including a deliberate stall. Grok's injection *is* confirmed against the live site; the other four are not.
-
----
-
-## Operating framework
-
-This project follows Build-Priming v2.
-
-
-Modes active for this project: BUILD
-@~/frameworks/build-priming/FRAMEWORK.md
-
-Gaining a scheduled job, a walk-away batch job, or a user-facing surface is a **pre-flight event**: re-run `MODE-PICKER.md`, add the mode here, and work that playbook's Part 1 before the first run in the new mode.
+**What still needs a human, because a throwaway profile has no logins:** injection into a real composer on each of the five sites, submission, response detection, and a full Ping Pong session including a deliberate stall. Run it after any selector or injection change, and whenever a site ships a redesign: on 2026-11-02 four of the five had changed under the extension at once. The procedure that worked: a hotkey ring (Claude → ChatGPT → Gemini → Copilot → Grok → Claude, auto-submit off) proves capture and injection on all five, then one Ping Pong session proves auto-send and response detection.

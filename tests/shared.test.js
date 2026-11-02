@@ -22,7 +22,40 @@ const {
   CHAT_URL_PATTERNS,
   isFreshChatUrl,
   summarisePreflight,
+  localStamp,
 } = require("../shared.js");
+
+test("user-facing messages keep a space after every colon", () => {
+  // Found in a live session: an edit that replaced "stopped — " with "stopped: "
+  // lost the trailing space, so ten toasts read "Ping Pong stopped:the Claude tab
+  // was closed". No other check reads the wording of a toast.
+  const MESSAGE_CALL = /(?:notifyTab|showToast|setStatus)\([^;]*?(["`])((?:\\.|(?!\1).)*)\1/g;
+  const offenders = [];
+  let checked = 0;
+  for (const file of ["background.js", "content.js", "popup.js"]) {
+    const src = readFileSync(join(__dirname, "..", file), "utf8");
+    for (const m of src.matchAll(MESSAGE_CALL)) {
+      checked++;
+      // a letter, closing bracket or quote, then a colon, then anything but a space
+      if (/[A-Za-z)\]"']:(?![ /]|$)/.test(m[2])) offenders.push(`${file}: ${m[2]}`);
+    }
+  }
+  assert.ok(checked >= 30, `expected to examine at least 30 messages, examined ${checked}`);
+  assert.deepEqual(offenders, []);
+});
+
+test("localStamp prints local time, not UTC", () => {
+  // The transcript used to say 03:35 for a session started at 04:35 in Switzerland.
+  const saved = process.env.TZ;
+  try {
+    process.env.TZ = "Europe/Zurich";
+    assert.equal(localStamp(new Date(Date.UTC(2026, 10, 2, 3, 35))), "2026-11-02 04:35");
+    process.env.TZ = "America/New_York";
+    assert.equal(localStamp(new Date(Date.UTC(2026, 10, 2, 3, 5))), "2026-11-01 22:05");
+  } finally {
+    if (saved === undefined) delete process.env.TZ; else process.env.TZ = saved;
+  }
+});
 
 // ── load safety ────────────────────────────────────────────────────────────
 
@@ -49,7 +82,14 @@ test("cleanText strips per-site speaker prefixes", () => {
   assert.equal(cleanText("Gemini said\nHello there"), "Hello there");
   assert.equal(cleanText("Grok said Hello there"), "Hello there");
   assert.equal(cleanText("ChatGPT said Hello there"), "Hello there");
+  // chatgpt.com, Nov 2026: the label now ends in a colon and a blank line.
+  assert.equal(cleanText("ChatGPT said:\n\nNo, a Pop-Tart is not a ravioli."), "No, a Pop-Tart is not a ravioli.");
   assert.equal(cleanText("Answer (Claude said) here"), "Answer  here");
+});
+
+test("cleanText leaves 'ChatGPT said' alone when it is not the prefix", () => {
+  // Should fail if the prefix rule ever loses its ^ anchor.
+  assert.equal(cleanText("I disagree with what ChatGPT said: it is a sandwich."), "I disagree with what ChatGPT said: it is a sandwich.");
 });
 
 test("cleanText strips Grok's thinking indicator from the front of a capture", () => {
@@ -69,6 +109,23 @@ test("cleanText strips Grok's thinking indicator from the front of a capture", (
     cleanText("Here is the answer.\n\nWorked for 6s was the log line."),
     "Here is the answer.\n\nWorked for 6s was the log line."
   );
+});
+
+test("cleanText cleans a real Grok capture from Nov 2026", () => {
+  // Captured live from grok.com: speaker label, thinking indicator, source chips
+  // (each a U+2060 word joiner plus the source name) and a trailing source count.
+  const raw = "Grok\nWorked for 14s\n\nTechnically yes, since pizza uses a dough crust.\u2060Pizzachefhq\n\n" +
+    "However, pizza is not generally considered one.\u2060Chefsresource\n\n15 sources";
+  assert.equal(
+    cleanText(raw),
+    "Technically yes, since pizza uses a dough crust.\n\nHowever, pizza is not generally considered one."
+  );
+});
+
+test("cleanText keeps 'sources' when it is the model's own words", () => {
+  // Must fail if the trailing-count rule loses its anchors.
+  assert.equal(cleanText("I checked 15 sources and they agree."), "I checked 15 sources and they agree.");
+  assert.equal(cleanText("Two claims.\n\n3 sources disagree with the second."), "Two claims.\n\n3 sources disagree with the second.");
 });
 
 test("cleanText collapses 3+ blank lines to one", () => {
@@ -113,15 +170,15 @@ test("isFreshChatUrl tells a new chat from an existing conversation", () => {
     claude: ["https://claude.ai/new", "https://claude.ai/"],
     chatgpt: ["https://chatgpt.com/", "https://chatgpt.com/?model=auto"],
     gemini: ["https://gemini.google.com/app", "https://gemini.google.com/app/"],
-    copilot: ["https://copilot.microsoft.com/"],
+    copilot: ["https://copilot.com/", "https://copilot.com/en-gb/", "https://copilot.com/chat"],
     grok: ["https://grok.com/", "https://grok.com/?ref=x"],
   };
   const existing = {
     claude: ["https://claude.ai/chat/abc-123"],
     chatgpt: ["https://chatgpt.com/c/abc-123", "https://chatgpt.com/g/g-x/c/abc"],
     gemini: ["https://gemini.google.com/app/9f8e7d6c"],
-    copilot: ["https://copilot.microsoft.com/chats/abc123"],
-    grok: ["https://grok.com/chat/abc-123"],
+    copilot: ["https://copilot.com/chats/abc123", "https://copilot.com/chat/conversation/31fb8061-4cd9"],
+    grok: ["https://grok.com/chat/abc-123", "https://grok.com/c/4418e1f5-1cf5?rid=2e69"],
   };
   for (const [id, urls] of Object.entries(fresh)) {
     for (const u of urls) assert.equal(isFreshChatUrl(id, u), true, `${id} ${u} should read as fresh`);
@@ -207,7 +264,7 @@ test("formatTranscript renders a header, the pair, and every entry in order", ()
     { labelA: "Claude", labelB: "ChatGPT", rounds: 2, modeLabel: "Ask to critique", startedAt: "2026-08-10 18:00" },
     ENTRIES
   );
-  assert.match(out, /^# LLM Ping — Claude ↔ ChatGPT/);
+  assert.match(out, /^# LLM Ping: Claude ↔ ChatGPT/);
   assert.match(out, /2 rounds · mode: Ask to critique · 2026-08-10 18:00/);
   assert.match(out, /## 1 · Claude/);
   assert.match(out, /## 2 · ChatGPT/);
@@ -235,7 +292,7 @@ test("formatTranscript says so when nothing was captured", () => {
 });
 
 test("formatTranscript pluralises rounds and survives missing metadata", () => {
-  assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /^# LLM Ping — \? ↔ \?/);
+  assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /^# LLM Ping: \? ↔ \?/);
   assert.match(formatTranscript({ rounds: 1 }, ENTRIES), /1 round(?! )/);
   assert.match(formatTranscript({ rounds: 2 }, ENTRIES), /2 rounds/);
   assert.doesNotThrow(() => formatTranscript(null, null));

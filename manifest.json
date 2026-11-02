@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "LLM Ping",
-  "version": "3.7.0",
-  "description": "Ping responses between AI chatbots — bounce, broadcast, or start a Ping Pong conversation.",
+  "version": "3.8.0",
+  "description": "Bounce answers between ChatGPT, Claude, Gemini, Copilot and Grok, or let two AIs debate each other in Ping Pong mode.",
   "minimum_chrome_version": "102",
   "permissions": [
     "contextMenus",
     "storage",
-    "tabs",
     "scripting",
     "clipboardWrite"
   ],
@@ -15,7 +14,7 @@
     "https://chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
-    "https://copilot.microsoft.com/*",
+    "https://copilot.com/*",
     "https://grok.com/*"
   ],
   "background": {
@@ -39,7 +38,7 @@
         "https://chatgpt.com/*",
         "https://claude.ai/*",
         "https://gemini.google.com/*",
-        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
         "https://grok.com/*"
       ],
       "js": ["shared.js", "content.js"],

@@ -1,4 +1,4 @@
-// ── LLM Ping – Background Service Worker v3.7.0 ──
+// ── LLM Ping – Background Service Worker v3.8.0 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.
@@ -9,7 +9,8 @@ const TARGETS = {
   claude:  { label: "Claude",   url: "https://claude.ai/new",          match: "claude.ai" },
   chatgpt: { label: "ChatGPT",  url: "https://chatgpt.com/",           match: "chatgpt.com" },
   gemini:  { label: "Gemini",   url: "https://gemini.google.com/app",  match: "gemini.google.com" },
-  copilot: { label: "Copilot",  url: "https://copilot.microsoft.com/", match: "copilot.microsoft.com" },
+  // Microsoft moved Copilot to copilot.com in 2026; copilot.microsoft.com now redirects there.
+  copilot: { label: "Copilot",  url: "https://copilot.com/",           match: "copilot.com" },
   grok:    { label: "Grok",     url: "https://grok.com/",              match: "grok.com" },
 };
 
@@ -179,7 +180,7 @@ async function rehydrateChain() {
   if (!aTab || !bTab) {
     chainState = freshChainState();
     chainState.currentRound = saved.currentRound || 0;
-    chainState.lastError = "Ping Pong ended — a chain tab was closed while the extension was asleep.";
+    chainState.lastError = "Ping Pong ended: a chain tab was closed while the extension was asleep.";
     console.log("[LLM Ping] " + chainState.lastError);
     persistChainState();
     broadcastChainState();
@@ -201,7 +202,7 @@ const MENU_URL_PATTERNS = [
   "https://chatgpt.com/*",
   "https://claude.ai/*",
   "https://gemini.google.com/*",
-  "https://copilot.microsoft.com/*",
+  "https://copilot.com/*",
   "https://grok.com/*",
 ];
 
@@ -628,7 +629,9 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
     tabB: bTab.id,
     sourceWindowId: aTab.windowId,
     lastProgressAt: Date.now(),
-    startedAt: new Date().toISOString().replace("T", " ").slice(0, 16),
+    // Local time. toISOString() is UTC, and printed without a zone it read as an
+    // hour off for a user in Switzerland, which is how this was found.
+    startedAt: localStamp(new Date()),
     awaitingTargetId: llmA,
   });
 
@@ -663,8 +666,8 @@ async function startChain({ llmA, llmB, mode, maxRounds, windowId, allowExisting
   persistChainState();
   broadcastChainState();
 
-  await notifyTab(chainState.tabA, `🏓 Ping Pong armed — submit your question here to start`);
-  await notifyTab(chainState.tabB, `🏓 Ping Pong armed — waiting for ${TARGETS[llmA].label}`);
+  await notifyTab(chainState.tabA, `🏓 Ping Pong armed. Submit your question here to start`);
+  await notifyTab(chainState.tabB, `🏓 Ping Pong armed. Waiting for ${TARGETS[llmA].label}`);
 
   return { ok: true, state: publicChainState() };
 }
@@ -753,10 +756,10 @@ async function startBackgroundPolling() {
         : null;
       const reason = waitingOn
         ? `${waitingOn} did not respond for ${mins} min (rate limit, or still thinking)`
-        : `Stalled — no progress for ${mins} min`;
+        : `Stalled: no progress for ${mins} min`;
       stopChain(reason);
-      await notifyTab(chainState.tabA, `⚠️ Ping Pong stopped — ${reason}`);
-      await notifyTab(chainState.tabB, `⚠️ Ping Pong stopped — ${reason}`);
+      await notifyTab(chainState.tabA, `⚠️ Ping Pong stopped: ${reason}`);
+      await notifyTab(chainState.tabB, `⚠️ Ping Pong stopped: ${reason}`);
       return;
     }
 
@@ -875,13 +878,13 @@ async function handlePollFailure(tabId, targetId, message) {
   if (!tab) {
     stopChain(`${TARGETS[targetId]?.label || targetId} tab no longer exists`);
     const other = tabId === chainState.tabA ? chainState.tabB : chainState.tabA;
-    await notifyTab(other, `⚠️ Ping Pong stopped — the ${TARGETS[targetId]?.label} tab was closed`);
+    await notifyTab(other, `⚠️ Ping Pong stopped: the ${TARGETS[targetId]?.label} tab was closed`);
     return;
   }
 
   if (state.failures >= MAX_POLL_FAILURES) {
     stopChain(`Lost contact with the ${TARGETS[targetId]?.label || targetId} tab`);
-    await notifyTab(tabId, `⚠️ Ping Pong stopped — lost contact with this tab. Reload it and start again.`);
+    await notifyTab(tabId, `⚠️ Ping Pong stopped: lost contact with this tab. Reload it and start again.`);
   }
 }
 
@@ -907,7 +910,7 @@ async function resetTabToIdle(tabId) {
 
 async function stopForRepeatedSkips(tabId, why) {
   stopChain(`Stopped after ${MAX_CONSECUTIVE_SKIPS} skipped responses: ${why}`);
-  await notifyTab(tabId, `⚠️ Ping Pong stopped — ${why}.`);
+  await notifyTab(tabId, `⚠️ Ping Pong stopped: ${why}.`);
 }
 
 async function handleResponseComplete(senderTabId) {
@@ -973,7 +976,7 @@ async function handleResponseComplete(senderTabId) {
   if (chainState.lastInjectedText && cleanedText === cleanText(chainState.lastInjectedText)) {
     const giveUp = recordSkip("self-echo (grabbed our own injected text)");
     await resetTabToIdle(senderTabId);
-    if (giveUp) await stopForRepeatedSkips(senderTabId, `${TARGETS[senderTargetId].label} is showing our own message back — if it is asking you to choose a preferred response, pick one`);
+    if (giveUp) await stopForRepeatedSkips(senderTabId, `${TARGETS[senderTargetId].label} is showing our own message back. If it is asking you to choose a preferred response, pick one`);
     return;
   }
 
@@ -987,7 +990,7 @@ async function handleResponseComplete(senderTabId) {
   if (previousFromThisTab && previousFromThisTab === cleanedText) {
     const label = TARGETS[senderTargetId].label;
     stopChain(`${label} sent an identical response twice in a row`);
-    await notifyTab(senderTabId, `⚠️ Ping Pong stopped — ${label} repeated itself exactly, so it is probably not receiving the message.`);
+    await notifyTab(senderTabId, `⚠️ Ping Pong stopped: ${label} repeated itself exactly, so it is probably not receiving the message.`);
     return;
   }
   chainState.lastTextByTab[senderTabId] = cleanedText;
@@ -1002,7 +1005,7 @@ async function handleResponseComplete(senderTabId) {
   // incremented first and tested >=, so 1 delivered none and 5 delivered four.
   if (!shouldBounce(chainState.currentRound, chainState.maxRounds)) {
     stopChain(`Reached max rounds (${chainState.maxRounds})`);
-    await notifyTab(senderTabId, `🏁 Ping Pong complete — ${chainState.maxRounds} rounds finished`);
+    await notifyTab(senderTabId, `🏁 Ping Pong complete: ${chainState.maxRounds} rounds finished`);
     return;
   }
 
@@ -1014,7 +1017,7 @@ async function handleResponseComplete(senderTabId) {
   const finalText = applyWrapper(mode.wrapper, cleanedText);
 
   console.log(`[LLM Ping] === Round ${roundNumber}/${chainState.maxRounds} === ${senderTargetId} → ${nextTargetId}, ${finalText.length} chars`);
-  await notifyTab(senderTabId, `🔄 Round ${roundNumber}/${chainState.maxRounds} — sending to ${nextTarget.label}...`);
+  await notifyTab(senderTabId, `🔄 Round ${roundNumber}/${chainState.maxRounds}: sending to ${nextTarget.label}...`);
 
   chainState.bouncing = true;
   chainState.lastBouncedText = cleanedText;
@@ -1041,8 +1044,8 @@ async function handleResponseComplete(senderTabId) {
       ? (result.reason || "injection failed")
       : "the message was typed but the send button never became clickable";
     stopChain(`Bounce to ${nextTarget.label} failed: ${why}`);
-    await notifyTab(nextTabId, `⚠️ Ping Pong stopped — could not send to ${nextTarget.label} (${why}).`);
-    await notifyTab(senderTabId, `⚠️ Ping Pong stopped — could not send to ${nextTarget.label}.`);
+    await notifyTab(nextTabId, `⚠️ Ping Pong stopped: could not send to ${nextTarget.label} (${why}).`);
+    await notifyTab(senderTabId, `⚠️ Ping Pong stopped: could not send to ${nextTarget.label}.`);
     return;
   }
   if (!result.submitted) {
@@ -1074,7 +1077,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const closedId = targetIdForTab(tabId);
   const otherTabId = tabId === chainState.tabA ? chainState.tabB : chainState.tabA;
   stopChain(`${TARGETS[closedId]?.label || closedId} tab was closed`);
-  notifyTab(otherTabId, `⚠️ Ping Pong stopped — the ${TARGETS[closedId]?.label} tab was closed`);
+  notifyTab(otherTabId, `⚠️ Ping Pong stopped: the ${TARGETS[closedId]?.label} tab was closed`);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -1239,13 +1242,23 @@ async function clipboardFallback(tabId, text) {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: (txt) => {
-        navigator.clipboard.writeText(txt).catch(() => {});
-        const t = document.createElement("div");
-        t.id = "llm-bounce-toast";
-        t.textContent = "📋 Copied to clipboard — paste with Ctrl+V";
-        document.body.appendChild(t);
-        requestAnimationFrame(() => t.classList.add("show"));
-        setTimeout(() => t.remove(), 3500);
+        // The toast reports what actually happened. It used to say "Copied" even when
+        // the write was refused, which it is whenever the page does not have focus.
+        const show = (message) => {
+          const t = document.createElement("div");
+          t.id = "llm-bounce-toast";
+          t.textContent = message;
+          document.body.appendChild(t);
+          requestAnimationFrame(() => t.classList.add("show"));
+          setTimeout(() => t.remove(), 3500);
+        };
+        navigator.clipboard.writeText(txt).then(
+          () => show("📋 Copied to clipboard. Paste it into the chat"),
+          (err) => {
+            console.error("[LLM Ping] Clipboard fallback failed:", err && err.message);
+            show("⚠️ Could not send or copy the text. Click into this page and try again");
+          }
+        );
       },
       args: [text],
     });

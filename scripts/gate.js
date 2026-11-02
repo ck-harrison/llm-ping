@@ -427,17 +427,10 @@ check("Docs coverage", () => {
   const undocumented = SHIPPING_FILES.filter((f) => !f.startsWith("icons/") && !claude.includes(f));
 
   // The inverse: no doc may point at a file that no longer exists.
-  // Exempt, by name and with a reason: Build-Priming playbooks live in
-  // ~/frameworks/build-priming/ and are imported, not vendored, so they are
-  // correctly absent from this repo.
-  const EXTERNAL_DOCS = new Set([
-    "MODE-PICKER.md", "FRAMEWORK.md", "CORE.md", "OPERATE.md", "PIPELINE.md",
-    "CANDIDATES.md", "E-patterns.md", "CHANGELOG.md", "CLAUDE.local.md",
-  ]);
   const referenced = new Set();
   for (const doc of [claude, readme]) {
     for (const m of doc.matchAll(/`([\w./-]+\.(?:js|json|html|css|sh|md|docx))`/g)) {
-      if (!EXTERNAL_DOCS.has(m[1])) referenced.add(m[1]);
+      referenced.add(m[1]);
     }
   }
   const dangling = [...referenced].filter((f) => !existsSync(p(f)));

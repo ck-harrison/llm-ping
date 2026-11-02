@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Source for icon16/48/128.png. Re-render with: bash scripts/make-icons.sh
+       Chrome Web Store guidance: 96px of artwork inside 16px of transparent padding.
+       Colours are the popup's own: navy #1a1a2e, purple #6C5CE7, plus coral #FF7A59. -->
+  <rect x="16" y="16" width="96" height="96" rx="22" fill="#1a1a2e"/>
+  <path d="M33 50H54A8 8 0 0 1 62 58V76A8 8 0 0 1 54 84H40L28 94L31 83.5A8 8 0 0 1 25 76V58A8 8 0 0 1 33 50Z" fill="#6C5CE7"/>
+  <path d="M95 50H74A8 8 0 0 0 66 58V76A8 8 0 0 0 74 84H88L100 94L97 83.5A8 8 0 0 0 103 76V58A8 8 0 0 0 95 50Z" fill="#FF7A59"/>
+  <path d="M46 46Q64 14 82 46" fill="none" stroke="#F4F1EA" stroke-width="3" stroke-linecap="round" stroke-dasharray="0.5 6" opacity="0.6"/>
+  <circle cx="64" cy="30" r="8.5" fill="#F4F1EA"/>
+</svg>

@@ -4,57 +4,86 @@
 
 ## Chrome Web Store
 
-### Title (45 char max)
-```
-LLM Ping — Bounce Between AI Chatbots Instantly
-```
+Everything in this section is public-facing: no em-dashes.
 
-### Short Description (132 char max)
+### Name
+The store takes the listing name from `manifest.json` ("LLM Ping"). There is no
+separate title field.
+
+### Summary
+Also taken from the manifest `description` (132 char max):
 ```
-Right-click any AI response to bounce it to ChatGPT, Claude, Gemini, Copilot, or Grok. Ping Pong mode: two AIs debate autonomously.
+Bounce answers between ChatGPT, Claude, Gemini, Copilot and Grok, or let two AIs debate each other in Ping Pong mode.
 ```
 
 ### Full Description
 ```
-LLM Ping lets you bounce AI responses between ChatGPT, Claude, Gemini, Copilot, and Grok with a single right-click or keyboard shortcut.
+LLM Ping moves AI answers between ChatGPT, Claude, Gemini, Copilot and Grok with one right-click or keyboard shortcut. Or press Start and let two of them argue it out on their own.
 
 FEATURES
 
-Right-click bounce — Ping any response to another AI instantly.
-Highlight bounce — Select specific text, ping just that part.
-Modify mode — Add instructions: Critique, Improve, Compare, or Expand.
-Broadcast — Send to all AIs simultaneously.
-Fresh-chat check — Before a Ping Pong session starts, LLM Ping makes sure both AIs are open and on new chats, and offers to open them for you. Override it if you want to run on an existing conversation.
-In-page controls — A round counter, a Stop button and Copy transcript sit on both tabs, so you never have to hunt for the popup mid-session.
-Ping Pong — Start an autonomous conversation between two AIs. Watch them debate, iterate on code, or refine ideas without lifting a finger. Choose how each round is framed: pass through, critique, improve, compare, or expand.
-Copy transcript — Take the whole exchange out as Markdown, during a session or after it.
-Hotkeys — Ctrl+Shift+1 through 5 for each AI. Fully customizable.
+Ping Pong: start a conversation between two AIs and watch them debate, review each other's code, or refine an idea, round after round. Choose how each round is framed: pass the answer through as-is, or ask for a critique, an improvement, a comparison, or an expansion.
+Right-click bounce: send any answer to another AI.
+Highlight bounce: select part of an answer and send just that.
+Broadcast: send the same text to every AI at once.
+Fresh-chat check: before Ping Pong starts, LLM Ping makes sure both AIs are open on new chats, and offers to open them for you.
+In-page controls: a round counter, a Stop button and Copy transcript sit on both tabs, so you never need the popup mid-session.
+Copy transcript: take the whole exchange out as Markdown, during a session or after it.
+Hotkeys: Ctrl+Shift+1 to 5 for each AI, all customisable.
 
 HOW IT WORKS
 
-1. Open two or more AI tabs (ChatGPT, Claude, Gemini, Copilot, Grok)
-2. Get a response from any AI
-3. Right-click → Ping to another AI
-4. Or start Ping Pong and watch two AIs go back and forth automatically
+1. Open two AI tabs and sign in as you normally would
+2. Ask one of them a question
+3. Right-click the answer and send it to another AI
+4. Or open the popup, pick two AIs, and press Start
 
-No API keys. No accounts. No subscriptions. Works with the free web interfaces you already use.
+No API keys and no LLM Ping account. It works with the web versions of the chatbots you already use.
 
 SUPPORTED AIs
 
 • ChatGPT (chatgpt.com)
 • Claude (claude.ai)
 • Gemini (gemini.google.com)
-• Copilot (copilot.microsoft.com)
+• Copilot (copilot.com)
 • Grok (grok.com)
-
-WHY LLMPING
-
-You already have multiple AI tabs open. You already copy-paste between them. LLM Ping removes the friction. And Ping Pong mode does something no other tool can — it makes two AIs talk to each other.
 
 PRIVACY
 
-LLM Ping runs entirely in your browser. No data leaves your machine. No analytics. No tracking. No server.
+LLM Ping has no server, no analytics and no tracking, and collects nothing. It only reads the five AI sites above, and it only sends text into another of those sites when you ask it to. Full policy: https://ckharrison.xyz/llm-ping-privacy.html
+
+HELP
+
+Step-by-step guide and troubleshooting: https://ckharrison.xyz/llm-ping-help.html
 ```
+
+### Dashboard links
+- **Homepage URL / Support URL:** `https://ckharrison.xyz/llm-ping-help.html`
+
+### Category
+Productivity (Tools is the alternative).
+
+### Developer Dashboard: Privacy practices tab
+
+**Single purpose:**
+```
+Move AI chatbot responses between the ChatGPT, Claude, Gemini, Copilot and Grok websites, including letting two of them hold an automatic back-and-forth conversation.
+```
+
+**Permission justifications:**
+- `contextMenus`: Adds the right-click "send to" menu that sends selected text or the latest answer to another AI.
+- `storage`: Remembers the user's settings (hotkeys, rounds, chosen AIs) and keeps a running Ping Pong session alive if the service worker restarts.
+- `scripting`: Injects the extension's own content script into an AI tab that was already open before the extension was installed or updated, so it can paste text there.
+- `clipboardWrite`: Copy transcript button, and a fallback that copies the text when pasting into a site fails.
+- Host permissions (the five AI sites): Read the AI's response and paste text into the site's chat box. No other sites are accessed.
+
+**Remote code:** No, I am not using remote code.
+
+**Data usage:** tick **Website content** only (it reads AI responses on the five
+sites). Leave everything else unticked. Then certify all three: not sold to third
+parties, not used for unrelated purposes, not used for creditworthiness.
+
+**Privacy policy URL:** `https://ckharrison.xyz/llm-ping-privacy.html`
 
 ---
 

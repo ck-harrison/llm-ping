@@ -1,4 +1,4 @@
-// ── LLM Ping – Shared pure helpers v3.7.0 ──
+// ── LLM Ping – Shared pure helpers v3.8.0 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)
@@ -40,10 +40,18 @@
     if (!text) return "";
     return text
       .replace(/\n{3,}/g, "\n\n")
+      // Grok (Nov 2026) puts a source chip after a cited sentence. In the DOM it is
+      // a word joiner (U+2060) followed by the source's name, so capture read
+      // "toppings.<U+2060>Pizzachefhq". The word joiner does not occur in ordinary prose.
+      .replace(/\u2060\S*/g, "")
+      // ...and closes the answer with a "15 sources" button.
+      .replace(/\n+\d+\s+sources?\s*$/i, "")
+      .replace(/^grok\s*\n/i, "")
       // Grok prefixes a response with its own thinking indicator — "Worked for 6s",
       // "Thought for 12 seconds". It sits inside the message bubble, so capture
       // takes it, and every bounced turn arrived at the other model with a stray
-      // timing line on the front. Only stripped at the start of a capture.
+      // timing line on the front. Only stripped at the start of a capture, and
+      // after the "Grok" speaker label, which since Nov 2026 comes before it.
       .replace(/^(?:worked|thought|thinking)\s+for\s+\d+\s*(?:s|sec|secs|seconds|m|min|mins|minutes)?\b[ \t]*\n*/i, "")
       .replace(/^copilot\s+said\s+/i, "")
       .replace(/^copilot\s+said[:.]?\s*/gim, "")
@@ -54,7 +62,7 @@
       .replace(/^gemini\s*\n/i, "")
       .replace(/^grok\s+said\s*/gim, "")
       .replace(/^grok\s*\n/i, "")
-      .replace(/^chatgpt\s+said\s+/i, "")
+      .replace(/^chatgpt\s+said[:.]?\s*/i, "")
       .replace(/\(\w+\s+said\)/gi, "")
       .trim();
   }
@@ -76,10 +84,10 @@
   // from this object, which is why no parity check is needed between them.
   var MODES = {
     raw:      { label: "Send as-is",       wrapper: null },
-    critique: { label: "Ask to critique",  wrapper: "Here is a response from another AI model. Please critique it — identify weaknesses, missing nuance, or errors, and suggest improvements:\n\n---\n{TEXT}\n---" },
+    critique: { label: "Ask to critique",  wrapper: "Here is a response from another AI model. Please critique it: identify weaknesses, missing nuance, or errors, and suggest improvements:\n\n---\n{TEXT}\n---" },
     improve:  { label: "Ask to improve",   wrapper: "Here is a response from another AI model. Please rewrite and improve it, keeping the same intent but making it stronger, clearer, and more accurate:\n\n---\n{TEXT}\n---" },
     compare:  { label: "Ask to compare",   wrapper: "Here is a response from another AI model to a user's question. Please provide your own independent answer to the same question, then compare your answer with the one below, noting where you agree and disagree:\n\n---\n{TEXT}\n---" },
-    expand:   { label: "Ask to expand",    wrapper: "Here is a response from another AI model. Please expand on it — add depth, examples, and anything important that was missed:\n\n---\n{TEXT}\n---" },
+    expand:   { label: "Ask to expand",    wrapper: "Here is a response from another AI model. Please expand on it: add depth, examples, and anything important that was missed:\n\n---\n{TEXT}\n---" },
   };
 
   // ── Transcript formatting ────────────────────────────────────────────────
@@ -89,7 +97,7 @@
     meta = meta || {};
     entries = entries || [];
     var lines = [];
-    lines.push("# LLM Ping — " + (meta.labelA || "?") + " ↔ " + (meta.labelB || "?"));
+    lines.push("# LLM Ping: " +(meta.labelA || "?") + " ↔ " + (meta.labelB || "?"));
 
     var bits = [];
     var rounds = meta.rounds || 0;
@@ -100,7 +108,7 @@
     lines.push("");
 
     // Say what is missing rather than letting the transcript imply it is whole.
-    lines.push("The opening prompt you typed is not captured — this transcript starts with the first AI response.");
+    lines.push("The opening prompt you typed is not captured. This transcript starts with the first AI response.");
     if (meta.truncated) {
       lines.push("INCOMPLETE: this session passed the transcript size limit, so responses after the ones below were not recorded.");
     }
@@ -132,7 +140,8 @@
     chatgpt: /\/c\//,
     gemini:  /\/app\/[^/?#]+/,
     copilot: /\/chats?\/[^/?#]+/,
-    grok:    /\/chat\//,
+    // Grok used /chat/<id>; since Nov 2026 it is /c/<id>. Both read as existing.
+    grok:    /\/c(?:hat)?\/[^/?#]+/,
   };
 
   function isFreshChatUrl(targetId, url) {
@@ -326,7 +335,17 @@
     return Math.min(max, Math.max(min, n));
   }
 
+  // "YYYY-MM-DD HH:MM" in the date's local time zone, for the transcript header.
+  // The caller passes the Date in, so this stays pure. It replaced
+  // toISOString(), which is UTC and read as an hour off in Switzerland.
+  function localStamp(d) {
+    function pad(n) { return String(n).padStart(2, "0"); }
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
   return {
+    localStamp: localStamp,
     cleanText: cleanText,
     applyWrapper: applyWrapper,
     MODES: MODES,

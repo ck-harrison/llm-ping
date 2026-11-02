@@ -1,4 +1,4 @@
-// ── LLM Ping – Popup v3.7.0 ──
+// ── LLM Ping – Popup v3.8.0 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {
@@ -395,7 +395,7 @@ chrome.runtime.sendMessage({ action: "getChainState" }, (response) => {
   updateUI(response.active, response.currentRound, response.maxRounds, response.transcriptEntries);
   if (!response.active && response.lastError) setStatus("⚠️ " + response.lastError);
   else if (!response.active && response.stoppedReason && response.currentRound > 0) {
-    setStatus(`✓ ${response.currentRound} rounds — ${response.stoppedReason}`);
+    setStatus(`✓ ${response.currentRound} rounds. ${response.stoppedReason}`);
   }
 });
 
@@ -403,7 +403,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === "chainStateUpdate") {
     updateUI(msg.state.active, msg.state.currentRound, msg.state.maxRounds, msg.state.transcriptEntries);
     if (!msg.state.active && msg.state.stoppedReason) {
-      setStatus(`${msg.state.currentRound} rounds — ${msg.state.stoppedReason}`);
+      setStatus(`${msg.state.currentRound} rounds. ${msg.state.stoppedReason}`);
     }
   }
 });
@@ -434,7 +434,7 @@ function updateUI(active, currentRound = 0, maxRounds = 5, transcriptEntries) {
   btnCopyTranscript.style.display = lastTranscriptEntries > 0 ? "block" : "none";
 
   if (active) {
-    setStatus(`🏓 Ping Pong — round ${currentRound}/${maxRounds}`, true);
+    setStatus(`🏓 Ping Pong: round ${currentRound}/${maxRounds}`, true);
   } else if (currentRound > 0) {
     setStatus(`✓ Completed ${currentRound} rounds`);
   } else {

@@ -2,18 +2,31 @@
 
 State of the world. Read this first; update it before the session ends.
 
-**Last updated:** 2026-08-11
-**Version:** 3.7.0
-**Modes:** BUILD
-**Git:** `main`, pushed to `origin`. Check `git status` for anything uncommitted.
+**Last updated:** 2026-11-02 03:44 UTC
+**Version:** 3.8.0
+**Git:** `main`. The 3.8.0 work is **uncommitted** (not asked for yet). Check `git status`.
 
 ---
 
 ## Where the project stands
 
-Working Chrome MV3 extension, **not yet published** to the Chrome Web Store. Five
+Working Chrome MV3 extension, **packaged for the Chrome Web Store and not yet
+submitted**. `llm-ping-3.8.0.zip` (11 files, 49 KB, sha256 `c0fda8a4…62aa05`) plus
+five 1280×800 screenshots, a 440×280 promo tile and a demo video were produced on
+2026-11-02; they live outside the repo (`~/Desktop/llm-ping-tiles/store/`). Five
 supported sites (Claude, ChatGPT, Gemini, Copilot, Grok). No build step, no
-dependencies: 2,907 lines of shipping vanilla JS plus 1,911 in tests and tooling.
+dependencies: 2,978 lines of shipping vanilla JS plus 2,080 in tests and tooling.
+
+**User docs:** `README.md` is now a full user and developer guide. A public help
+page (`~/Code/Personal-Site/public/llm-ping-help.html`, images in
+`~/Code/Personal-Site/public/llm-ping/`) is linked from the popup's rewritten
+Instructions panel, the README and the store description.
+
+**Blocking submission:** the privacy policy and help pages are written
+(`~/Code/Personal-Site/public/llm-ping-privacy.html`) but **not deployed**, because
+that repo had another session's uncommitted work in it. The store requires its URL,
+`https://ckharrison.xyz/llm-ping-privacy.html`. Deploying also means re-running
+that repo's `tools/make-sitemap.py`.
 
 Ping Pong **has run successfully in real signed-in use** — see "Verified in real
 use" below. It went from 3.2.0 to 3.7.0 in one session: a full review found 21
@@ -28,9 +41,9 @@ Measured, not recalled. Re-run these rather than trusting the numbers:
 |---|---|
 | `node scripts/gate.js` | 13 checks, 13 pass |
 | `bash scripts/canary.sh` | 18 canaries, all prove their check can fail |
-| `node --test` | 60 tests, 60 pass |
-| `node scripts/browser-check.js` | 19 checks against real Chrome, all pass |
-| `bash scripts/package.sh` | 11 files, 74 KB, no internal paths; both refusal paths exit 1 |
+| `node --test` | 65 tests, 65 pass |
+| `node scripts/browser-check.js` | 19 checks against real Chrome, all pass; installs with no warnings now that `tabs` is gone |
+| `bash scripts/package.sh` | 11 files, 49 KB, no internal paths |
 
 ## Verified — in a real Chrome
 
@@ -54,6 +67,22 @@ terminate when idle, which is why chain state is mirrored to `storage.session`.
 
 ## Verified — in real use, signed in
 
+**2026-11-02, v3.8.0, all five sites signed in:**
+
+- **Capture and injection work on all five**, by a hotkey ring with auto-submit
+  off: Claude → ChatGPT → Gemini → Copilot → Grok → Claude. Each target's composer
+  was read back and held the source's answer.
+- **A full Claude ↔ Copilot Ping Pong works**: 6 rounds, auto-send into both,
+  round counter correct, stopped at "Reached max rounds (6)", Copy transcript gave
+  7 entries (6 bounced + the final one). What Copilot received was Claude's text
+  only, with no thinking-status lines. This closes the old "Claude and Copilot end
+  to end" gap.
+- Not re-verified live after the last three fixes (the colon spacing in toasts,
+  Grok capture cleanup, local transcript time). Those are text-only and each has a
+  unit test proven to fail without its fix.
+
+**Earlier:**
+
 - **A full Ping Pong session works.** Gemini ↔ Grok, 8 rounds, both models
   responding to each other's actual arguments, round accounting correct (9
   responses captured, 8 bounces delivered).
@@ -66,8 +95,9 @@ terminate when idle, which is why chain state is mirrored to `storage.session`.
 
 ## Still not verified
 
-1. **Claude and Copilot end to end.** Gemini, Grok and ChatGPT have run in real
-   sessions. Claude and Copilot injection is unverified against a signed-in DOM.
+1. **Ping Pong with Grok, ChatGPT or Gemini on the new UIs.** All three pass a
+   single bounce on v3.8.0, but no Ping Pong session has run against Grok's new
+   tiptap editor, and whether its paste path needs window focus is untested.
 2. **`submitted: true`** — whether composer-clear detection recognises a *successful*
    send has never been confirmed. It is proven to report failure correctly. If it
    were wrong in the optimistic direction, every bounce would log an
@@ -116,10 +146,14 @@ No open decisions.
   validation, and `.thinking-container` persists after Think mode. Both caused
   infinite streaming loops. The rule is an early return keyed on hostname, and a
   test fails if it is removed.
-- **Do not** replace `document.execCommand('insertText')` for Grok with
-  `setNativeValue`. It is a React controlled textarea; execCommand is the only
-  method that triggers React's handlers. Deprecated, and still the only thing that
-  works.
+- **Do not** replace `document.execCommand('insertText')` with `setNativeValue`
+  in Grok's *textarea fallback*. On the previous UI it was a React controlled
+  textarea and execCommand was the only thing that worked. Since Nov 2026 Grok's
+  real composer is a tiptap editor, filled by a synthetic paste instead.
+- **Do not** write into a Lexical or tiptap editor with innerHTML, innerText or
+  synthetic input events. Both ignore them and the composer stays empty. A
+  synthetic `paste` works, but only after the editor has seen the selection, which
+  takes one short wait.
 - **Do not** lower `MIN_COMPLETE_LEN` to fix short replies. That floor is
   accidentally doing a second job — keeping a brief placeholder left in a message
   bubble from being accepted as the response. Use the streaming signal instead.
@@ -141,6 +175,39 @@ No open decisions.
 
 Each entry keeps the reasoning, because the reasoning is what stops the same class
 of bug coming back.
+
+## 3.8.0 — store preparation, and four sites had moved
+
+Started as packaging for the Chrome Web Store. Live testing in a signed-in browser
+then found that **four of the five sites had changed under the extension**, and
+none of it was visible to the gate, the unit tests or the headless browser check:
+
+- **Copilot moved to copilot.com** (the old host redirects), so the extension had
+  no permission there at all, and its composer became a Lexical editor that
+  ignored the old injection. Its answer selectors had also gone stale.
+- **ChatGPT** dropped `#prompt-textarea` and `data-message-author-role`. Injection
+  survived by luck through the generic fallback; capture did not. Its new "ChatGPT
+  said:" label was not stripped, because the rule expected a space, not a colon.
+- **Grok** moved to a tiptap editor and left the old textarea in the DOM, hidden,
+  so the hard-won execCommand path wrote into an invisible box. Its chat URLs
+  became `/c/<id>`, so an existing chat would pass the fresh-chat check, and its
+  captures gained a speaker label, source chips and a source count.
+
+Store work: `tabs` permission removed (Chrome warned users it could "read your
+browsing history"; host permissions already cover every tab URL the code reads),
+an original icon replaced an emoji-style one of unknown origin, em-dashes were
+removed from all user-facing text, an accurate privacy policy was drafted, and the
+store copy's claim that "no data leaves your machine" was corrected: the extension
+pastes text into other AI services, which is the point of it.
+
+Smaller bugs found the same way: the clipboard fallback said "Copied" when the copy
+had failed, the transcript printed UTC as if it were local time, and an edit that
+replaced "stopped — " with "stopped: " lost the trailing space in eleven toasts. The
+last one now has a test that scans every toast and status string.
+
+The lesson: **the mechanical checks prove the code agrees with itself; only a
+signed-in session proves it agrees with the sites.** Run the hotkey ring after any
+site redesign.
 
 ## 3.3.0 — the review
 

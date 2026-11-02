@@ -108,7 +108,7 @@ canary "Mode registry single source" \
 
 canary "Mode registry single source" \
   "a mode wrapper missing the {TEXT} placeholder" \
-  "perl -0pi -e 's/Please expand on it — add depth, examples, and anything important that was missed:\\\\n\\\\n---\\\\n\{TEXT\}\\\\n---/Please expand on it./' shared.js"
+  "perl -0pi -e 's/(expand:[^\\n]*?)\\{TEXT\\}/\$1/' shared.js"
 
 canary "Watchdog keys on observable activity" \
   "the activity check removed, so the watchdog goes back to keying on phase transitions" \

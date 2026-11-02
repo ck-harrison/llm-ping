@@ -1,4 +1,4 @@
-// ── LLM Ping – Content Script v3.7.0 ──
+// ── LLM Ping – Content Script v3.8.0 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //
@@ -219,7 +219,7 @@
       hudStop.style.display = "";
       hudStop.disabled = false;
     } else {
-      hudText.textContent = "🏓 Stopped — " + state.reason;
+      hudText.textContent = "🏓 Stopped: " + state.reason;
       hudStop.style.display = "none";
       // Leave the ended state up long enough to read and copy from, then get out
       // of the way rather than living on the page forever.
@@ -237,10 +237,10 @@
         return;
       }
       navigator.clipboard.writeText(res.text).then(function () {
-        showToast("📋 Transcript copied — " + res.entries + " responses" + (res.truncated ? " (incomplete)" : ""));
+        showToast("📋 Transcript copied: " + res.entries + " responses" + (res.truncated ? " (incomplete)" : ""));
       }).catch(function (e) {
         console.log("[LLM Ping] Clipboard write failed:", e && e.message);
-        showToast("⚠️ Could not copy — try the Copy transcript button in the popup");
+        showToast("⚠️ Could not copy. Try the Copy transcript button in the popup");
       });
     });
   }
@@ -256,9 +256,15 @@
 
   var MESSAGE_SELECTORS = {
     "claude.ai": [".font-claude-response", ".standard-markdown"],
-    "chatgpt.com": ["[data-message-author-role='assistant']", ".agent-turn", ".markdown.prose"],
+    // chatgpt.com (Nov 2026) dropped data-message-author-role. Each turn is now a
+    // block keyed "<turn>:user" or "<turn>:assistant". Its text starts "ChatGPT said:",
+    // which cleanText strips. The older selectors stay as fallbacks.
+    "chatgpt.com": ["[data-content-search-unit-key$=':assistant']", "[data-message-author-role='assistant']", ".agent-turn", ".markdown.prose"],
     "gemini.google.com": ["structured-content-container.model-response-text", ".response-container-content", ".response-content"],
-    "copilot.microsoft.com": ["[data-content='ai-message']", ".ac-container"],
+    // copilot.com (Nov 2026): answers are [data-testid='markdown-reply']; the user's own
+    // message is [data-testid='chatOutput'], so it is never picked up as an answer.
+    // The older two are kept as fallbacks for any region still on the previous UI.
+    "copilot.com": ["[data-testid='markdown-reply']", "[data-content='ai-message']", ".ac-container"],
     "grok.com": [".message-bubble", ".response-content-markdown"],
   };
 
@@ -480,7 +486,7 @@
       var composer = getComposer(target);
       var landed = composerText(composer);
       if (!landed) {
-        throw new Error("composer is still empty after injection — the tab may not have had focus");
+        throw new Error("composer is still empty after injection; the tab may not have had focus");
       }
       // A mismatch is reported but not fatal: sites reformat pasted text, and
       // killing a working session over whitespace would be worse than the warning.
@@ -490,13 +496,13 @@
       }
 
       if (!autoSubmit) {
-        showToast("✅ Message loaded — review and press Enter to send");
+        showToast("✅ Message loaded. Review it and press Enter to send");
         return { ok: true, clicked: false, submitted: false, autoSubmit: false };
       }
       return sleep(300)
         .then(function () { return clickSendButton(target); })
         .then(function (result) {
-          showToast(result.clicked ? "✅ Ping sent!" : "✅ Message loaded — press Enter");
+          showToast(result.clicked ? "✅ Ping sent!" : "✅ Message loaded. Press Enter to send");
           return { ok: true, clicked: result.clicked, submitted: result.submitted, autoSubmit: true };
         });
     }).catch(function (err) {
@@ -506,7 +512,7 @@
       // for a response that was never going to be generated.
       console.error("[LLM Ping] Injection failed:", err);
       return navigator.clipboard.writeText(text).then(function () {
-        showToast("📋 Copied to clipboard — paste with Ctrl+V");
+        showToast("📋 Copied to clipboard. Paste it into the chat");
         return { ok: false, reason: "clipboard-fallback", error: err && err.message };
       }).catch(function () {
         showToast("⚠️ Could not inject or copy.");
@@ -519,10 +525,13 @@
   // "the message actually went". Mirrors the injection targets.
   var COMPOSER_SELECTORS = {
     claude: ['[contenteditable="true"].ProseMirror', '[contenteditable="true"]'],
-    chatgpt: ["#prompt-textarea", '[contenteditable="true"]'],
+    chatgpt: ["#prompt-textarea", '[contenteditable="true"].ProseMirror', '[contenteditable="true"]'],
     gemini: ['.ql-editor[contenteditable="true"]', '[contenteditable="true"]'],
-    copilot: ["textarea", '[contenteditable="true"]'],
-    grok: ["textarea"],
+    copilot: ['[contenteditable="true"][data-lexical-editor]', "textarea", '[contenteditable="true"]'],
+    // Grok (Nov 2026) composes in a tiptap editor. A textarea is still in the DOM but
+    // hidden (visibility:hidden, aria-hidden), so reading it back would report every
+    // injection as failed. The textarea stays last, for the previous UI.
+    grok: ['.tiptap[contenteditable="true"]', '[contenteditable="true"].ProseMirror', "textarea"],
   };
 
   function getComposer(target) {
@@ -692,17 +701,47 @@
   }
 
   function injectCopilot(text) {
-    return waitForEl("textarea", 2000).then(function (ed) {
-      return ed || waitForEl('[contenteditable="true"]', 2000);
-    }).then(function (ed) {
-      if (!ed) throw new Error("Copilot input not found");
-      ed.focus();
-      if (ed.tagName === "TEXTAREA" || ed.tagName === "INPUT") setNativeValue(ed, text);
-      else { ed.innerText = text; triggerInput(ed); }
+    // copilot.com (Nov 2026) uses a Lexical editor. Lexical ignores innerText writes
+    // and synthetic input events, so the old method left the composer empty. It does
+    // accept a synthetic paste, confirmed on the live site.
+    return waitForEl('[contenteditable="true"][data-lexical-editor]', 2000).then(function (lex) {
+      if (lex) return pasteIntoEditor(lex, text);
+      return waitForEl("textarea", 1000).then(function (ed) {
+        if (!ed) throw new Error("Copilot input not found");
+        ed.focus();
+        setNativeValue(ed, text);
+      });
+    });
+  }
+
+  // Replace a rich editor's contents (Lexical on Copilot, tiptap/ProseMirror on Grok)
+  // by pasting. These editors track the selection from selectionchange events, which
+  // fire asynchronously: paste before the editor has seen the select-all and the text
+  // is appended to whatever was there instead of replacing it. Hence the two short
+  // waits, both found necessary on the live site.
+  function pasteIntoEditor(ed, text) {
+    ed.focus();
+    return sleep(50).then(function () {
+      var sel = window.getSelection();
+      var range = document.createRange();
+      range.selectNodeContents(ed);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return sleep(100);
+    }).then(function () {
+      var dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      ed.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+      return sleep(150);
     });
   }
 
   function injectGrok(text) {
+    // Grok (Nov 2026) moved to a tiptap editor, which accepts a synthetic paste
+    // (confirmed on the live site). The textarea path below is the previous UI's
+    // hard-won method, kept for any user still served that version.
+    var tiptap = document.querySelector('.tiptap[contenteditable="true"]');
+    if (tiptap) return pasteIntoEditor(tiptap, text);
     return waitForEl("textarea", 2000).then(function (ed) {
       if (!ed) throw new Error("Grok input not found");
       ed.focus();
