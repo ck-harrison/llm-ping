@@ -8,6 +8,8 @@ It works with the normal websites you already use. No API keys, no LLM Ping acco
 
 ![Two AIs debating in Ping Pong mode, with the LLM Ping round counter at the bottom left](docs/images/ping-pong.jpg)
 
+**[Download the latest release](https://github.com/ck-harrison/llm-ping/releases/latest)** and follow the [install steps](#install): about two minutes, no account needed. Free and open source (MIT).
+
 **User guide:** [ckharrison.net/llm-ping-help.html](https://ckharrison.net/llm-ping-help.html) · **Privacy policy:** [ckharrison.net/llm-ping-privacy.html](https://ckharrison.net/llm-ping-privacy.html)
 
 ---
@@ -27,6 +29,7 @@ It works with the normal websites you already use. No API keys, no LLM Ping acco
 - [How it works](#how-it-works)
 - [Development](#development)
 - [Reporting a broken site](#reporting-a-broken-site)
+- [Contributing](#contributing)
 - [Version](#version)
 - [License](#license)
 
@@ -61,7 +64,7 @@ It works with the normal websites you already use. No API keys, no LLM Ping acco
 
 On a Mac the hotkeys use the **Control** key, not Command.
 
-All five were last verified against the live, signed-in sites on 2 November 2026 (version 3.8.0). These sites redesign without notice; see [Reporting a broken site](#reporting-a-broken-site).
+All five were last verified against the live, signed-in sites on 2 November 2026 (version 3.8.0). Version 3.8.1 changed only how ChatGPT is handled, and was tested on ChatGPT. These sites redesign without notice; see [Reporting a broken site](#reporting-a-broken-site).
 
 ## Install
 
@@ -79,7 +82,7 @@ Or clone the repository and load its folder the same way. The whole repository l
 
 **Updating:** download the new release, replace the folder's contents with it, then click the reload arrow on the LLM Ping card at `chrome://extensions` and reload your AI tabs. Your settings are kept. Chrome does not update unpacked extensions on its own; watch the repository's releases to hear about new versions.
 
-Requires Chrome 102 or later.
+Requires Chrome 102 or later. Other Chromium browsers (Edge, Brave, Arc) offer the same Load unpacked option and should work, but are untested.
 
 ## Quick start
 
@@ -264,15 +267,29 @@ bash scripts/make-icons.sh     # re-renders the icon PNGs from icons/icon.svg
 
 ## Reporting a broken site
 
-When an AI site redesigns, LLM Ping can stop finding its message box or its answers on that site. Please open an issue, or email [contact@ckharrison.net](mailto:contact@ckharrison.net), with:
+When an AI site redesigns, LLM Ping can stop finding its message box or its answers on that site. Please [open an issue](https://github.com/ck-harrison/llm-ping/issues), or email [contact@ckharrison.net](mailto:contact@ckharrison.net), with:
 
 - which site, and whether you were sending one answer or running Ping Pong;
 - the message LLM Ping showed, if any;
 - the lines starting `[LLM Ping]` from the page's console (right-click the page, Inspect, Console).
 
+## Contributing
+
+Issues and pull requests are welcome. A fix for a site that has redesigned is the most useful contribution there is.
+
+Before opening a pull request:
+
+1. Run `node scripts/gate.js` and make sure every check passes. If you add or change a gate check, run `bash scripts/canary.sh` too.
+2. If you touched selectors or how a message box is filled, test on the live, signed-in site (step 5 under [Development](#development)), and say in the pull request which sites you tested.
+3. Keep to the project's rules: no dependencies, no build step, and the conventions above.
+
+The comments in `content.js` and `shared.js`, and `CLAUDE.md`, explain why the odd-looking parts are the way they are. Most of them fixed a real failure; read the reason before simplifying one.
+
 ## Version
 
 3.8.1
+
+What changed in each version: [Releases](https://github.com/ck-harrison/llm-ping/releases).
 
 ## License
 
