@@ -451,7 +451,7 @@ check("Docs coverage", () => {
 check("Package allowlist", () => {
   const script = read("scripts/package.sh");
   const missing = SHIPPING_FILES.filter((f) => !script.includes(f) && !script.includes(f.split("/")[0] + "/"));
-  // The store package is downloadable and unzippable by anyone. These must never
+  // The release zip is downloadable and unzippable by anyone. These must never
   // be in it.
   const mustNotShip = ["CLAUDE.md", "docs/", "README.md", "tests/", "scripts/", ".git"];
   const leaked = mustNotShip.filter((f) => new RegExp(`^\\s*"?${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m").test(script));

@@ -1,4 +1,4 @@
-// ── LLM Ping – Popup v3.8.0 ──
+// ── LLM Ping – Popup v3.8.1 ──
 // clampRounds / formatting helpers come from shared.js (loaded before this file).
 
 const TARGETS = {

@@ -65,16 +65,19 @@ All five were last verified against the live, signed-in sites on 2 November 2026
 
 ## Install
 
-**From the Chrome Web Store:** coming soon.
+LLM Ping is not on the Chrome Web Store. It installs straight from GitHub, using Chrome's own **Load unpacked** option.
 
-**From source (developer mode):**
+1. Go to the [latest release](https://github.com/ck-harrison/llm-ping/releases/latest) and download `llm-ping-<version>.zip` (under **Assets**).
+2. Unzip it, and put the folder somewhere it can stay. Chrome loads the extension from that folder every time it starts, so don't delete it.
+3. Open `chrome://extensions` in Chrome.
+4. Turn on **Developer mode** (top right).
+5. Click **Load unpacked** and choose the unzipped folder (the one containing `manifest.json`).
+6. Pin LLM Ping: click the puzzle-piece icon in the toolbar, then the pin next to LLM Ping.
+7. **Reload any AI tabs that were already open.** A tab only gets the extension when it loads.
 
-1. Download or clone this repository.
-2. Open `chrome://extensions` in Chrome.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and choose the repository folder.
-5. Pin LLM Ping: click the puzzle-piece icon in the toolbar, then the pin next to LLM Ping.
-6. **Reload any AI tabs that were already open.** A tab only gets the extension when it loads.
+Or clone the repository and load its folder the same way. The whole repository loads as-is; there is no build step.
+
+**Updating:** download the new release, replace the folder's contents with it, then click the reload arrow on the LLM Ping card at `chrome://extensions` and reload your AI tabs. Your settings are kept. Chrome does not update unpacked extensions on its own; watch the repository's releases to hear about new versions.
 
 Requires Chrome 102 or later.
 
@@ -241,7 +244,7 @@ node scripts/gate.js           # the quality gate: run before calling anything d
 node --test                    # unit tests only
 bash scripts/canary.sh         # proves every gate check can still fail
 node scripts/browser-check.js  # installs the extension in a real headless Chrome and checks it (~25 s)
-bash scripts/package.sh        # builds llm-ping-<version>.zip for the Chrome Web Store
+bash scripts/package.sh        # builds llm-ping-<version>.zip, the file attached to each GitHub release
 bash scripts/make-icons.sh     # re-renders the icon PNGs from icons/icon.svg
 ```
 
@@ -269,7 +272,7 @@ When an AI site redesigns, LLM Ping can stop finding its message box or its answ
 
 ## Version
 
-3.8.0
+3.8.1
 
 ## License
 

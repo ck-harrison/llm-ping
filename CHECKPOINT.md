@@ -2,65 +2,50 @@
 
 State of the world. Read this first; update it before the session ends.
 
-**Last updated:** 2026-11-04 (afternoon)
-**Version:** 3.8.0 (`fc2ef8a`). The three ChatGPT fixes below are now committed on top of it, still as 3.8.0 (no version bump, no new package).
-**Git:** `main`, pushed to origin. `AGENTS.md` is untracked on purpose.
+**Last updated:** 2026-11-04 (evening)
+**Version:** 3.8.1: 3.8.0 plus the three ChatGPT fixes below. Released on GitHub as `v3.8.1`.
+**Git:** `main`, pushed. History was rewritten on 2026-11-04 (see below), so any clone made before that must be re-cloned. `AGENTS.md` is untracked on purpose.
+**Distribution:** open source on GitHub (`ck-harrison/llm-ping`, **public** since 2026-11-04). **Not** on the Chrome Web Store: dropped on 2026-11-04 rather than pay the developer registration fee. Users download the release zip and use Load unpacked. Everything tracked here is public, this file included.
 **Domain:** `ckharrison.net` is primary. Help page, privacy page and contact email (`contact@ckharrison.net`) all moved from `.xyz` on 2026-11-04.
 
 ---
 
-## PAUSED HERE (2026-11-04 09:39 UTC): pick up from this section
+## Going public (2026-11-04)
 
-**Fixes since 3.8.0, committed 2026-11-04** (in CLAUDE.md, background.js, content.js, shared.js, tests/boot.test.js, tests/shared.test.js; version still 3.8.0):
+- `docs/llm-ping-gtm-strategy.docx` (marked Confidential, monetization plan) and its earlier name `docs/pingit-gtm-strategy.docx` were removed from the **entire history** with `git filter-repo`, then force-pushed. The private copy is `~/Documents/llm-ping-private/llm-ping-gtm-strategy.docx`. A pre-rewrite mirror was kept in the session scratchpad only, so it is gone after that session.
+- Store copy removed from `docs/llm-ping-descriptions.md`; README, help page and privacy page now describe the GitHub install. The privacy page no longer cites the Chrome Web Store User Data Policy and changes are announced in GitHub release notes.
+
+## Fixes in 3.8.1
+
 1. **ChatGPT false start.** A turn that begins while the reply has no text yet (thinking) let the *previous* reply sit stable 4s and complete, stopping the session as "identical response twice". Fix: `falseStart` in `advancePollPhase` (shared.js); the baseline text never completes. **Verified live** (two later sessions got past that point).
 2. **ChatGPT Writing card.** Some answers are an editable ProseMirror "Writing" card earlier in the DOM; injection went into it and overwrote the answer. Fix: composer found as `form [contenteditable="true"]` first (content.js). Selector verified on the live page (matches only the composer); **a live injection with a Writing card present is UNVERIFIED**.
-3. ChatGPT stop button `aria-label="Stop"` in `isStillStreaming` (from earlier in the same session).
+3. ChatGPT stop button `aria-label="Stop"` in `isStillStreaming`.
 
-Gate on 2026-11-04: 13/13 PASS, 69 tests. Canary: 18 checks prove they can fail. Each new test failed before its fix.
-
-**Demo videos (done, delivered):** `~/Desktop/llm-ping-tiles/demos/{product,deep-dive,story}/` each with mp4 (1920x1080 30fps), transcript or screenshots. Old takes in `_old-takes/`. Known flaws: deep dive's last ChatGPT shot already shows "Stopped" in the HUD; the setup shot shows the session started while the popup still shows Start. User has not yet said "videos ok".
-
-**Video pipeline (to re-render):** `~/Desktop/llm-ping-tiles/demos/_source/`. `cd video && python3 render.py spec-story.json out.mp4` (system python3 has PIL; needs ffmpeg). Specs: spec-story / spec-product2 / spec-deep2, sessions s2 / s5 / s6. Each shot can carry `redact` blur boxes (the user's name) and `popup`. `popup-shot.js` (node) makes the popup image: env `POPUP_CFG`, `OUT`. Re-render from this folder verified 2026-11-04 (story, 41.1s, same as delivered).
-
-**Decision pending from the user** (asked, not answered):
-- **"release check"**: one short live Ping Pong session each with Claude, Copilot and Grok (not rechecked since these fixes), then the batch below, then ask about 3.8.1; or
-- **"commit now"**: bump to 3.8.1 in all seven places, `bash scripts/package.sh`, `node scripts/browser-check.js`, commit locally (no push).
+**Not live-rechecked since these fixes:** Claude, Copilot, Grok. 3.8.1 was released without that check, at the owner's direction ("go public").
 
 **Next fix batch (logged, not started):**
 - `cleanText`: strip ChatGPT Writing-card label ("Writing") and its suggestion chips from captures.
 - `finalizeTranscript`: an early stop can record ChatGPT's last answer twice (truncated then full text).
 - Help page: warn not to type during a Grok session. Update help page, popup Instructions and README together.
 
-**Release verdict given:** OK as a free beta after one clean live session per AI; sites change often, so every version needs a live check.
+**Demo videos:** made 2026-11-02 to 11-04, kept outside the repo (`~/Desktop/llm-ping-tiles/demos/`, render pipeline in `_source/`). Not yet signed off by the owner.
 
-**Live-testing notes:** after any code change, reload the card at chrome://extensions **and** reload the AI tabs. Keep the user's other chats and side panels out of recordings. Copy transcript needs a real click and overwrites the clipboard (it did once; the user was told).
+**Live-testing notes:** after any code change, reload the card at chrome://extensions **and** reload the AI tabs. Keep other chats and side panels out of recordings. Copy transcript needs a real click and overwrites the clipboard.
 
 ---
 
 ## Where the project stands
 
-Working Chrome MV3 extension, **packaged for the Chrome Web Store and not yet
-submitted**. `llm-ping-3.8.0.zip` (11 files, 49 KB, sha256 `c0fda8a4…62aa05`) plus
-five 1280×800 screenshots, a 440×280 promo tile and a demo video were produced on
-2026-11-02; they live outside the repo (`~/Desktop/llm-ping-tiles/store/`). Five
-supported sites (Claude, ChatGPT, Gemini, Copilot, Grok). No build step, no
-dependencies: 2,978 lines of shipping vanilla JS plus 2,080 in tests and tooling.
+Working Chrome MV3 extension, released as open source on GitHub. Five supported
+sites (Claude, ChatGPT, Gemini, Copilot, Grok). No build step, no dependencies.
 
-**User docs:** `README.md` is now a full user and developer guide. A public help
+**User docs:** `README.md` is a full user and developer guide. A public help
 page (`~/Code/Personal-Site/public/llm-ping-help.html`, images in
-`~/Code/Personal-Site/public/llm-ping/`) is linked from the popup's rewritten
-Instructions panel, the README and the store description.
+`~/Code/Personal-Site/public/llm-ping/`) is linked from the popup's
+Instructions panel and the README.
 
-**Privacy and help pages are live:** `https://ckharrison.net/llm-ping-privacy.html`
-and `https://ckharrison.net/llm-ping-help.html` both returned HTTP 200 on
-2026-11-04 (curl). Sources in `~/Code/Personal-Site/public/`. The privacy URL
-moved from `.xyz` to `.net` on 2026-11-04; the page's canonical and the sitemap
-already used `.net`.
-
-**Store developer account not registered yet** (2026-11-04): the dashboard asks
-for the one-off registration fee and Christopher is holding off. When it is
-paid, enter `https://ckharrison.net/llm-ping-privacy.html` as the privacy
-policy URL (copy ready in `docs/llm-ping-descriptions.md`).
+**Privacy and help pages are live** at `https://ckharrison.net/llm-ping-privacy.html`
+and `https://ckharrison.net/llm-ping-help.html`. Sources in `~/Code/Personal-Site/public/`.
 
 Ping Pong **has run successfully in real signed-in use** — see "Verified in real
 use" below. It went from 3.2.0 to 3.7.0 in one session: a full review found 21
@@ -165,13 +150,13 @@ terminate when idle, which is why chain state is mirrored to `storage.session`.
 
 **License: MIT.** The only argument against was that MIT invites forks of the one
 feature no competitor has — which does not matter, since the editor is not looking
-to earn anything from this. `LICENSE` ships inside the store zip, as MIT requires.
+to earn anything from this. `LICENSE` ships inside the release zip, as MIT requires.
 
 **`docs/` stays out of the package.** Hygiene rather than commercial protection
-now, but a store package is downloadable by anyone and internal notes are not part
+now, but a release zip is downloadable by anyone and internal notes are not part
 of the product.
 
-No open decisions.
+**Distribution: GitHub, not the store** (2026-11-04). No open decisions.
 
 ## Dead ends worth not re-exploring
 

@@ -15,7 +15,7 @@ content.js      → Content script: text injection, response reading, hotkeys, i
 popup.html/js   → Popup UI: Ping Pong controls, hotkey settings, broadcast config
 toast.css       → In-page styling: the toast (bottom right) and the Ping Pong HUD
                   (bottom left). The only place raw colour values are allowed
-LICENSE         → MIT. Ships inside the store zip, as MIT requires of distributed copies
+LICENSE         → MIT. Ships inside the release zip, as MIT requires of distributed copies
 icons/icon.svg  → Source for the three icon PNGs: two chat bubbles (purple, coral) and a
                   ball, on a navy tile. Original artwork; the old icon was an emoji-style
                   paddle of unknown origin. Does not ship; the PNGs do
@@ -25,7 +25,7 @@ scripts/gate.js → Quality gate. Prints denominators and what each check does n
 scripts/canary.sh  → Plants each gate check's own violation and asserts it goes red
 scripts/browser-check.js → Installs the extension in a real headless Chrome and
                   asserts on what Chrome reports. Throwaway profile, no logins
-scripts/package.sh → Store zip from an explicit allowlist
+scripts/package.sh → Release zip from an explicit allowlist
 tests/          → node --test. shared.test.js covers the pure helpers;
                   boot.test.js evaluates background.js and content.js against
                   stubbed chrome.* APIs and drives their message handlers
@@ -34,6 +34,8 @@ CHECKPOINT.md   → State of the world. Read first, update last
 
 No build step. No bundler. No transpilation. No npm packages. Raw JS only.
 
+**Distribution: open source on GitHub, not the Chrome Web Store** (decided 2026-11-04). The repo `ck-harrison/llm-ping` is **public**, so this file and `CHECKPOINT.md` are public too: keep secrets, personal details and private business plans out of every tracked file. The go-to-market strategy document was removed from the repo and its whole history before it went public; the private copy is in `~/Documents/llm-ping-private/`. Users install a release zip with Load unpacked. To release: bump the version (the gate checks every place), run the gate and `browser-check`, `bash scripts/package.sh`, commit, push, then `gh release create v<version> llm-ping-<version>.zip`.
+
 ## Commands
 
 ```bash
@@ -41,7 +43,7 @@ node scripts/gate.js          # full quality gate — run before reporting anyth
 node --test                   # unit tests only (auto-discovers tests/)
 bash scripts/canary.sh        # prove every gate check can still fail
 node scripts/browser-check.js # install in a real Chrome and assert on it (~25s)
-bash scripts/package.sh       # build llm-ping-<version>.zip for the Chrome Web Store
+bash scripts/package.sh       # build llm-ping-<version>.zip for a GitHub release
 ```
 
 `LLMPING_SCREENSHOT=/tmp/popup.png node scripts/browser-check.js` also writes a
@@ -170,14 +172,13 @@ reload.
 
 ## Docs
 
-- `docs/llm-ping-gtm-strategy.docx` — Go-to-market, competitive landscape, monetization, launch plan
 - `docs/llm-ping-technical-reference.docx` — Full anomaly catalog, state machine docs, debugging guide
-- `docs/llm-ping-descriptions.md` — Ready-to-use copy for Chrome Web Store, GitHub, X, Reddit, HN, Product Hunt
+- `docs/llm-ping-descriptions.md` — Ready-to-use launch copy for GitHub, X, Reddit, HN, Product Hunt
 - `docs/images/` — screenshots used by the README
 
-**Public pages, in the Personal-Site repo, not this one:** `~/Code/Personal-Site/public/llm-ping-help.html` (the user guide at ckharrison.net/llm-ping-help.html, linked from the popup's Instructions panel and the README) and `~/Code/Personal-Site/public/llm-ping-privacy.html` (the store's privacy policy URL), with images in `~/Code/Personal-Site/public/llm-ping/`. When behaviour, menus, hotkeys or limits change, update the help page, the popup's Instructions panel and the README together: they describe the same things.
+**Public pages, in the Personal-Site repo, not this one:** `~/Code/Personal-Site/public/llm-ping-help.html` (the user guide at ckharrison.net/llm-ping-help.html, linked from the popup's Instructions panel and the README) and `~/Code/Personal-Site/public/llm-ping-privacy.html` (the privacy policy, linked from the README), with images in `~/Code/Personal-Site/public/llm-ping/`. When behaviour, menus, hotkeys or limits change, update the help page, the popup's Instructions panel and the README together: they describe the same things.
 
-None of `docs/`, this file, or `README.md` ships in the store package — `scripts/package.sh` refuses to include them.
+None of `docs/`, this file, or `README.md` ships in the release zip — `scripts/package.sh` refuses to include them.
 
 ---
 

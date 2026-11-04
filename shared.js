@@ -1,4 +1,4 @@
-// ── LLM Ping – Shared pure helpers v3.8.0 ──
+// ── LLM Ping – Shared pure helpers v3.8.1 ──
 //
 // Loaded three ways, deliberately:
 //   background.js   → importScripts("shared.js")               (classic service worker)

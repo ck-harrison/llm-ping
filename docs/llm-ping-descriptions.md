@@ -2,91 +2,6 @@
 
 ---
 
-## Chrome Web Store
-
-Everything in this section is public-facing: no em-dashes.
-
-### Name
-The store takes the listing name from `manifest.json` ("LLM Ping"). There is no
-separate title field.
-
-### Summary
-Also taken from the manifest `description` (132 char max):
-```
-Bounce answers between ChatGPT, Claude, Gemini, Copilot and Grok, or let two AIs debate each other in Ping Pong mode.
-```
-
-### Full Description
-```
-LLM Ping moves AI answers between ChatGPT, Claude, Gemini, Copilot and Grok with one right-click or keyboard shortcut. Or press Start and let two of them argue it out on their own.
-
-FEATURES
-
-Ping Pong: start a conversation between two AIs and watch them debate, review each other's code, or refine an idea, round after round. Choose how each round is framed: pass the answer through as-is, or ask for a critique, an improvement, a comparison, or an expansion.
-Right-click bounce: send any answer to another AI.
-Highlight bounce: select part of an answer and send just that.
-Broadcast: send the same text to every AI at once.
-Fresh-chat check: before Ping Pong starts, LLM Ping makes sure both AIs are open on new chats, and offers to open them for you.
-In-page controls: a round counter, a Stop button and Copy transcript sit on both tabs, so you never need the popup mid-session.
-Copy transcript: take the whole exchange out as Markdown, during a session or after it.
-Hotkeys: Ctrl+Shift+1 to 5 for each AI, all customisable.
-
-HOW IT WORKS
-
-1. Open two AI tabs and sign in as you normally would
-2. Ask one of them a question
-3. Right-click the answer and send it to another AI
-4. Or open the popup, pick two AIs, and press Start
-
-No API keys and no LLM Ping account. It works with the web versions of the chatbots you already use.
-
-SUPPORTED AIs
-
-• ChatGPT (chatgpt.com)
-• Claude (claude.ai)
-• Gemini (gemini.google.com)
-• Copilot (copilot.com)
-• Grok (grok.com)
-
-PRIVACY
-
-LLM Ping has no server, no analytics and no tracking, and collects nothing. It only reads the five AI sites above, and it only sends text into another of those sites when you ask it to. Full policy: https://ckharrison.net/llm-ping-privacy.html
-
-HELP
-
-Step-by-step guide and troubleshooting: https://ckharrison.net/llm-ping-help.html
-```
-
-### Dashboard links
-- **Homepage URL / Support URL:** `https://ckharrison.net/llm-ping-help.html`
-
-### Category
-Productivity (Tools is the alternative).
-
-### Developer Dashboard: Privacy practices tab
-
-**Single purpose:**
-```
-Move AI chatbot responses between the ChatGPT, Claude, Gemini, Copilot and Grok websites, including letting two of them hold an automatic back-and-forth conversation.
-```
-
-**Permission justifications:**
-- `contextMenus`: Adds the right-click "send to" menu that sends selected text or the latest answer to another AI.
-- `storage`: Remembers the user's settings (hotkeys, rounds, chosen AIs) and keeps a running Ping Pong session alive if the service worker restarts.
-- `scripting`: Injects the extension's own content script into an AI tab that was already open before the extension was installed or updated, so it can paste text there.
-- `clipboardWrite`: Copy transcript button, and a fallback that copies the text when pasting into a site fails.
-- Host permissions (the five AI sites): Read the AI's response and paste text into the site's chat box. No other sites are accessed.
-
-**Remote code:** No, I am not using remote code.
-
-**Data usage:** tick **Website content** only (it reads AI responses on the five
-sites). Leave everything else unticked. Then certify all three: not sold to third
-parties, not used for unrelated purposes, not used for creditworthiness.
-
-**Privacy policy URL:** `https://ckharrison.net/llm-ping-privacy.html`
-
----
-
 ## GitHub
 
 ### Repo Description (one-liner)
@@ -171,7 +86,7 @@ What it does:
 
 Works with ChatGPT, Claude, Gemini, Copilot, and Grok. No API keys needed — it works with the free web interfaces.
 
-[Chrome Web Store link]
+https://github.com/ck-harrison/llm-ping
 
 Would love feedback. What AI pairs have you found give the most interesting results?
 ```
@@ -243,7 +158,7 @@ I built a Chrome extension called LLM Ping that lets you bounce AI responses bet
 The feature your readers would find interesting: Ping Pong mode. You pick two AIs, type a question, and they go back and forth automatically — debating, iterating, and building on each other's responses. No copy-paste, no tab switching.
 
 60-second demo: [video link]
-Chrome Web Store: [link]
+GitHub: https://github.com/ck-harrison/llm-ping
 
 It's free, runs entirely client-side, and needs no API keys.
 

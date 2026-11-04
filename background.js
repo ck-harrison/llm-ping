@@ -1,4 +1,4 @@
-// ── LLM Ping – Background Service Worker v3.8.0 ──
+// ── LLM Ping – Background Service Worker v3.8.1 ──
 // Pure logic (text cleaning, the poll state machine, round accounting) lives in
 // shared.js so it can be tested with `node --test`. This file owns everything
 // that touches chrome.* APIs.

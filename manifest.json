@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LLM Ping",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "description": "Bounce answers between ChatGPT, Claude, Gemini, Copilot and Grok, or let two AIs debate each other in Ping Pong mode.",
   "minimum_chrome_version": "102",
   "permissions": [

@@ -1,4 +1,4 @@
-// ── LLM Ping – Content Script v3.8.0 ──
+// ── LLM Ping – Content Script v3.8.1 ──
 // Polling lives in background.js (immune to tab throttling). This script reads
 // the page, injects text, and handles hotkeys. Pure logic lives in shared.js.
 //

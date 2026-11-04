@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Build the Chrome Web Store zip from an explicit allowlist.
+# Build the release zip (attached to each GitHub release) from an explicit allowlist.
 #
 # The old command was `zip -r llm-ping.zip . -x ".*"`, which shipped 16 entries
-# including the internal go-to-market strategy document and CLAUDE.md. A store
-# package is downloadable and unzippable by anyone, so the default must be
+# including the internal go-to-market strategy document and CLAUDE.md. A release
+# zip is downloadable and unzippable by anyone, so the default must be
 # "nothing ships unless it is named here" rather than "everything ships unless it
 # is excluded".
 #
 # Never ships:
 #   - CLAUDE.md (internal working rules)
-#   - docs/ (GTM strategy, monetization, technical reference)
+#   - docs/ (launch copy, technical reference, README images)
 #   - README.md, tests/, scripts/, .git
 set -euo pipefail
 cd "$(dirname "$0")/.."
