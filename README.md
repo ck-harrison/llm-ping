@@ -8,7 +8,7 @@ It works with the normal websites you already use. No API keys, no LLM Ping acco
 
 ![Two AIs debating in Ping Pong mode, with the LLM Ping round counter at the bottom left](docs/images/ping-pong.jpg)
 
-**User guide:** [ckharrison.xyz/llm-ping-help.html](https://ckharrison.xyz/llm-ping-help.html) · **Privacy policy:** [ckharrison.xyz/llm-ping-privacy.html](https://ckharrison.xyz/llm-ping-privacy.html)
+**User guide:** [ckharrison.net/llm-ping-help.html](https://ckharrison.net/llm-ping-help.html) · **Privacy policy:** [ckharrison.net/llm-ping-privacy.html](https://ckharrison.net/llm-ping-privacy.html)
 
 ---
 
@@ -173,7 +173,7 @@ The popup header shows the running version.
 | Ping Pong stopped with "no progress" | That AI is waiting on something: a sign-in prompt, a usage limit, or Grok asking you to pick between two replies. |
 | A whole site stopped working | It has probably redesigned. See [Reporting a broken site](#reporting-a-broken-site). |
 
-The [user guide](https://ckharrison.xyz/llm-ping-help.html) has more detail.
+The [user guide](https://ckharrison.net/llm-ping-help.html) has more detail.
 
 ## Known limitations
 
@@ -202,7 +202,7 @@ LLM Ping has no server, no analytics and no tracking, and collects nothing. It r
 
 LLM Ping does not ask for the `tabs` permission, so Chrome shows no "read your browsing history" warning.
 
-Full policy: [ckharrison.xyz/llm-ping-privacy.html](https://ckharrison.xyz/llm-ping-privacy.html)
+Full policy: [ckharrison.net/llm-ping-privacy.html](https://ckharrison.net/llm-ping-privacy.html)
 
 ## How it works
 
@@ -261,7 +261,7 @@ bash scripts/make-icons.sh     # re-renders the icon PNGs from icons/icon.svg
 
 ## Reporting a broken site
 
-When an AI site redesigns, LLM Ping can stop finding its message box or its answers on that site. Please open an issue, or email [contact@ckharrison.xyz](mailto:contact@ckharrison.xyz), with:
+When an AI site redesigns, LLM Ping can stop finding its message box or its answers on that site. Please open an issue, or email [contact@ckharrison.net](mailto:contact@ckharrison.net), with:
 
 - which site, and whether you were sending one answer or running Ping Pong;
 - the message LLM Ping showed, if any;

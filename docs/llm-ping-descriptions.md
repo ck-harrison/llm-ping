@@ -50,15 +50,15 @@ SUPPORTED AIs
 
 PRIVACY
 
-LLM Ping has no server, no analytics and no tracking, and collects nothing. It only reads the five AI sites above, and it only sends text into another of those sites when you ask it to. Full policy: https://ckharrison.xyz/llm-ping-privacy.html
+LLM Ping has no server, no analytics and no tracking, and collects nothing. It only reads the five AI sites above, and it only sends text into another of those sites when you ask it to. Full policy: https://ckharrison.net/llm-ping-privacy.html
 
 HELP
 
-Step-by-step guide and troubleshooting: https://ckharrison.xyz/llm-ping-help.html
+Step-by-step guide and troubleshooting: https://ckharrison.net/llm-ping-help.html
 ```
 
 ### Dashboard links
-- **Homepage URL / Support URL:** `https://ckharrison.xyz/llm-ping-help.html`
+- **Homepage URL / Support URL:** `https://ckharrison.net/llm-ping-help.html`
 
 ### Category
 Productivity (Tools is the alternative).
@@ -83,7 +83,7 @@ Move AI chatbot responses between the ChatGPT, Claude, Gemini, Copilot and Grok 
 sites). Leave everything else unticked. Then certify all three: not sold to third
 parties, not used for unrelated purposes, not used for creditworthiness.
 
-**Privacy policy URL:** `https://ckharrison.xyz/llm-ping-privacy.html`
+**Privacy policy URL:** `https://ckharrison.net/llm-ping-privacy.html`
 
 ---
 

@@ -2,9 +2,38 @@
 
 State of the world. Read this first; update it before the session ends.
 
-**Last updated:** 2026-11-02 03:44 UTC
-**Version:** 3.8.0
-**Git:** `main`. The 3.8.0 work is **uncommitted** (not asked for yet). Check `git status`.
+**Last updated:** 2026-11-04 (afternoon)
+**Version:** 3.8.0 (`fc2ef8a`). The three ChatGPT fixes below are now committed on top of it, still as 3.8.0 (no version bump, no new package).
+**Git:** `main`, pushed to origin. `AGENTS.md` is untracked on purpose.
+**Domain:** `ckharrison.net` is primary. Help page, privacy page and contact email (`contact@ckharrison.net`) all moved from `.xyz` on 2026-11-04.
+
+---
+
+## PAUSED HERE (2026-11-04 09:39 UTC): pick up from this section
+
+**Fixes since 3.8.0, committed 2026-11-04** (in CLAUDE.md, background.js, content.js, shared.js, tests/boot.test.js, tests/shared.test.js; version still 3.8.0):
+1. **ChatGPT false start.** A turn that begins while the reply has no text yet (thinking) let the *previous* reply sit stable 4s and complete, stopping the session as "identical response twice". Fix: `falseStart` in `advancePollPhase` (shared.js); the baseline text never completes. **Verified live** (two later sessions got past that point).
+2. **ChatGPT Writing card.** Some answers are an editable ProseMirror "Writing" card earlier in the DOM; injection went into it and overwrote the answer. Fix: composer found as `form [contenteditable="true"]` first (content.js). Selector verified on the live page (matches only the composer); **a live injection with a Writing card present is UNVERIFIED**.
+3. ChatGPT stop button `aria-label="Stop"` in `isStillStreaming` (from earlier in the same session).
+
+Gate on 2026-11-04: 13/13 PASS, 69 tests. Canary: 18 checks prove they can fail. Each new test failed before its fix.
+
+**Demo videos (done, delivered):** `~/Desktop/llm-ping-tiles/demos/{product,deep-dive,story}/` each with mp4 (1920x1080 30fps), transcript or screenshots. Old takes in `_old-takes/`. Known flaws: deep dive's last ChatGPT shot already shows "Stopped" in the HUD; the setup shot shows the session started while the popup still shows Start. User has not yet said "videos ok".
+
+**Video pipeline (to re-render):** `~/Desktop/llm-ping-tiles/demos/_source/`. `cd video && python3 render.py spec-story.json out.mp4` (system python3 has PIL; needs ffmpeg). Specs: spec-story / spec-product2 / spec-deep2, sessions s2 / s5 / s6. Each shot can carry `redact` blur boxes (the user's name) and `popup`. `popup-shot.js` (node) makes the popup image: env `POPUP_CFG`, `OUT`. Re-render from this folder verified 2026-11-04 (story, 41.1s, same as delivered).
+
+**Decision pending from the user** (asked, not answered):
+- **"release check"**: one short live Ping Pong session each with Claude, Copilot and Grok (not rechecked since these fixes), then the batch below, then ask about 3.8.1; or
+- **"commit now"**: bump to 3.8.1 in all seven places, `bash scripts/package.sh`, `node scripts/browser-check.js`, commit locally (no push).
+
+**Next fix batch (logged, not started):**
+- `cleanText`: strip ChatGPT Writing-card label ("Writing") and its suggestion chips from captures.
+- `finalizeTranscript`: an early stop can record ChatGPT's last answer twice (truncated then full text).
+- Help page: warn not to type during a Grok session. Update help page, popup Instructions and README together.
+
+**Release verdict given:** OK as a free beta after one clean live session per AI; sites change often, so every version needs a live check.
+
+**Live-testing notes:** after any code change, reload the card at chrome://extensions **and** reload the AI tabs. Keep the user's other chats and side panels out of recordings. Copy transcript needs a real click and overwrites the clipboard (it did once; the user was told).
 
 ---
 
@@ -22,11 +51,16 @@ page (`~/Code/Personal-Site/public/llm-ping-help.html`, images in
 `~/Code/Personal-Site/public/llm-ping/`) is linked from the popup's rewritten
 Instructions panel, the README and the store description.
 
-**Blocking submission:** the privacy policy and help pages are written
-(`~/Code/Personal-Site/public/llm-ping-privacy.html`) but **not deployed**, because
-that repo had another session's uncommitted work in it. The store requires its URL,
-`https://ckharrison.xyz/llm-ping-privacy.html`. Deploying also means re-running
-that repo's `tools/make-sitemap.py`.
+**Privacy and help pages are live:** `https://ckharrison.net/llm-ping-privacy.html`
+and `https://ckharrison.net/llm-ping-help.html` both returned HTTP 200 on
+2026-11-04 (curl). Sources in `~/Code/Personal-Site/public/`. The privacy URL
+moved from `.xyz` to `.net` on 2026-11-04; the page's canonical and the sitemap
+already used `.net`.
+
+**Store developer account not registered yet** (2026-11-04): the dashboard asks
+for the one-off registration fee and Christopher is holding off. When it is
+paid, enter `https://ckharrison.net/llm-ping-privacy.html` as the privacy
+policy URL (copy ready in `docs/llm-ping-descriptions.md`).
 
 Ping Pong **has run successfully in real signed-in use** — see "Verified in real
 use" below. It went from 3.2.0 to 3.7.0 in one session: a full review found 21
@@ -41,7 +75,7 @@ Measured, not recalled. Re-run these rather than trusting the numbers:
 |---|---|
 | `node scripts/gate.js` | 13 checks, 13 pass |
 | `bash scripts/canary.sh` | 18 canaries, all prove their check can fail |
-| `node --test` | 65 tests, 65 pass |
+| `node --test` | 69 tests, 69 pass (2026-11-04, includes the uncommitted fixes) |
 | `node scripts/browser-check.js` | 19 checks against real Chrome, all pass; installs with no warnings now that `tabs` is gone |
 | `bash scripts/package.sh` | 11 files, 49 KB, no internal paths |
 
