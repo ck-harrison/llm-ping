@@ -61,12 +61,12 @@ Each LLM has a unique editor. The injection method was discovered through trial 
 Last verified against the signed-in live sites on 2026-11-02 (v3.8.0), by a hotkey bounce into each site and a 6-round Claude ↔ Copilot Ping Pong.
 
 - **Claude:** ProseMirror contenteditable → create `<p>`, clear innerHTML, append, dispatch input
-- **ChatGPT:** ProseMirror contenteditable (no id since Nov 2026; `#prompt-textarea` is gone, the generic fallback finds it) → set innerHTML with `<p>`, dispatch input
+- **ChatGPT:** ProseMirror contenteditable (no id since Nov 2026; `#prompt-textarea` is gone) → set innerHTML with `<p>`, dispatch input. The composer is found as `form [contenteditable="true"]`, ahead of the generic fallback: some answers are now a "Writing" card that is itself a ProseMirror editor earlier in the DOM, and the bare lookup injected into that card, overwriting ChatGPT's answer on screen (found live 2026-11-02)
 - **Gemini:** Quill `.ql-editor` → clear innerHTML, create `<p>`, dispatch input
 - **Copilot:** since Nov 2026 a **Lexical** editor on **copilot.com** (copilot.microsoft.com redirects there) → `pasteIntoEditor`: select all, wait for Lexical to see the selection, dispatch a synthetic `paste` with a DataTransfer. Lexical ignores innerHTML/innerText writes and input events. The old textarea + `setNativeValue()` path stays as a fallback
 - **Grok:** since Nov 2026 a **tiptap** (ProseMirror) editor → the same `pasteIntoEditor`. A textarea is still in the DOM but **hidden**, so the composer readback must not look at it. The old textarea + `execCommand('insertText')` path stays as a fallback for the previous UI
 
-**Answer selectors that changed in Nov 2026:** ChatGPT answers are `[data-content-search-unit-key$=':assistant']` and start "ChatGPT said:" (stripped by `cleanText`); Copilot answers are `[data-testid='markdown-reply']`; Grok chat URLs are `/c/<id>`. Grok captures now carry a "Grok" label, source chips (U+2060 + name) and a trailing "N sources", all stripped by `cleanText`.
+**Answer selectors that changed in Nov 2026:** ChatGPT answers are `[data-content-search-unit-key$=':assistant']` and start "ChatGPT said:" (stripped by `cleanText`); Copilot answers are `[data-testid='markdown-reply']`; Grok chat URLs are `/c/<id>`. ChatGPT's stop button is now plain `aria-label="Stop"` (no `data-testid`); `isStillStreaming` checks it on ChatGPT only. Without it ChatGPT never reported streaming and a long answer was bounced half-written at its first 4-second pause (found in a live Gemini ↔ ChatGPT session, 2026-11-02). Grok captures now carry a "Grok" label, source chips (U+2060 + name) and a trailing "N sources", all stripped by `cleanText`.
 
 ## Grok Rules — HARD-WON, DO NOT REVERT
 
@@ -85,6 +85,7 @@ Lives in `shared.js` as `advancePollPhase(state, obs, now, cfg)` — pure, so `t
 - streaming→cooldown: Text stable 2 seconds.
 - cooldown→complete: Text still stable 2 more seconds (4s total), and length > `MIN_COMPLETE_LEN` (20).
 - **Short replies depend on whether the site reports streaming.** Text over `SHORT_MIN_LEN` (3) but under 20 completes at the normal window **if `sawStreaming` is set** — the page told us it started and stopped generating, which is exactly the evidence the length floor was standing in for. With no streaming signal ever seen (Grok, by design) it waits `SHORT_COMPLETE_MS` (25s) and reports `complete-short`. Do not simply lower `MIN_COMPLETE_LEN`: that floor is accidentally doing a second job, keeping a brief placeholder left in a message bubble from being accepted as the response.
+- **The baseline text never completes.** If cooldown would complete on exactly the text that was on screen when the tab was reset, the tab goes back to idle with a `false-start` event and `falseStart` set, and from there new text alone (no new message) restarts it. Found live on 2026-11-02: after a bounce into ChatGPT its turn began while the reply had no text yet (thinking), the previous reply sat stable for 4s, completed, and the session stopped as "ChatGPT sent an identical response twice in a row". Tradeoff: a participant that really does repeat its last reply word for word is now ended by the stall watchdog after 3 minutes rather than by the repeat check.
 - Polling: 1s interval from the service worker (immune to tab throttling).
 - `waiting` phase: tab B is not polled until A's answer has been bounced to it.
 
@@ -174,7 +175,7 @@ reload.
 - `docs/llm-ping-descriptions.md` — Ready-to-use copy for Chrome Web Store, GitHub, X, Reddit, HN, Product Hunt
 - `docs/images/` — screenshots used by the README
 
-**Public pages, in the Personal-Site repo, not this one:** `~/Code/Personal-Site/public/llm-ping-help.html` (the user guide at ckharrison.xyz/llm-ping-help.html, linked from the popup's Instructions panel and the README) and `~/Code/Personal-Site/public/llm-ping-privacy.html` (the store's privacy policy URL), with images in `~/Code/Personal-Site/public/llm-ping/`. When behaviour, menus, hotkeys or limits change, update the help page, the popup's Instructions panel and the README together: they describe the same things.
+**Public pages, in the Personal-Site repo, not this one:** `~/Code/Personal-Site/public/llm-ping-help.html` (the user guide at ckharrison.net/llm-ping-help.html, linked from the popup's Instructions panel and the README) and `~/Code/Personal-Site/public/llm-ping-privacy.html` (the store's privacy policy URL), with images in `~/Code/Personal-Site/public/llm-ping/`. When behaviour, menus, hotkeys or limits change, update the help page, the popup's Instructions panel and the README together: they describe the same things.
 
 None of `docs/`, this file, or `README.md` ships in the store package — `scripts/package.sh` refuses to include them.
 

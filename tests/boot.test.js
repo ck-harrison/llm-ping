@@ -339,7 +339,7 @@ function bootContent(hostname, runTwice, opts) {
     // With stopButton on, any "Stop …" selector matches a visible element, which
     // is what makes the Grok test below discriminating rather than decorative.
     querySelector: (sel) => {
-      if (opts.stopButton && /Stop/i.test(sel)) {
+      if ((opts.stopButton && /Stop/i.test(sel)) || (opts.onlySelector && sel === opts.onlySelector)) {
         const el = fakeElement();
         el.offsetParent = fakeElement();
         return el;
@@ -349,6 +349,7 @@ function bootContent(hostname, runTwice, opts) {
       if (opts.emptyComposer && /contenteditable|textarea|prompt-textarea/i.test(sel)) {
         return opts.emptyComposer;
       }
+      if (opts.editors && opts.editors[sel]) return opts.editors[sel];
       return null;
     },
     querySelectorAll: () => [],
@@ -432,6 +433,20 @@ test("Grok never reports streaming, even with a visible stop button present", ()
   assert.equal(streamingFor("grok.com", { stopButton: false }), false);
 });
 
+test("ChatGPT's Nov 2026 stop button (aria-label exactly \"Stop\") means streaming", () => {
+  // Found live on 2026-11-02: ChatGPT's stop button lost data-testid="stop-button"
+  // and is now just aria-label="Stop", so no selector matched, ChatGPT never
+  // reported streaming, and a pause of 4s+ in a long answer (web search, images)
+  // bounced it half-written: 7,788 of 9,831 characters reached Gemini.
+  const sel = 'button[aria-label="Stop"]';
+  assert.equal(streamingFor("chatgpt.com", { onlySelector: sel }), true);
+  assert.equal(streamingFor("chatgpt.com", {}), false);
+  // Scoped to ChatGPT: a bare "Stop" label is too generic to trust elsewhere
+  // (a voice or media control), and Grok must stay false whatever is on the page.
+  assert.equal(streamingFor("claude.ai", { onlySelector: sel }), false);
+  assert.equal(streamingFor("grok.com", { onlySelector: sel }), false);
+});
+
 test("an injection that leaves the composer empty is reported as a failure", async () => {
   // The regression this pins, observed in a real 8-round session: Grok's
   // execCommand injection is a silent no-op without document focus, so the
@@ -449,6 +464,32 @@ test("an injection that leaves the composer empty is reported as a failure", asy
 
   assert.equal(reply.ok, false, "an injection that did not land must not report ok");
   assert.match(reply.error || "", /composer is still empty/);
+});
+
+test("ChatGPT injects into the composer, never into an editable Writing card in an answer", async () => {
+  // Found live on 2026-11-02: ChatGPT now shows some answers in a "Writing" card,
+  // which is itself a ProseMirror editor and comes before the composer in the DOM.
+  // The generic '[contenteditable="true"]' lookup found the card first, so the next
+  // bounce overwrote ChatGPT's own answer on screen and never reached the composer.
+  function editor() {
+    const el = fakeElement();
+    Object.defineProperty(el, "innerText", { get: () => el.children.map((c) => c.textContent).join("\n") });
+    return el;
+  }
+  const writingCard = editor();
+  const composer = editor();
+  const { calls } = bootContent("chatgpt.com", false, { editors: {
+    'form [contenteditable="true"]': composer,
+    '[contenteditable="true"].ProseMirror': writingCard,
+    '[contenteditable="true"]': writingCard,
+  } });
+  const handler = calls.fns["runtime.onMessage"][0];
+  const reply = await new Promise((resolve) => {
+    handler({ action: "injectText", text: "the next turn", target: "chatgpt", autoSubmit: false }, {}, resolve);
+  });
+  assert.equal(reply.ok, true, JSON.stringify(reply));
+  assert.equal(composer.innerText, "the next turn", "the text belongs in the composer");
+  assert.equal(writingCard.children.length, 0, "the answer card must not be touched");
 });
 
 // ── What these tests do NOT prove ──────────────────────────────────────────

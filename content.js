@@ -15,6 +15,7 @@
   console.log("[LLM Ping] Content script loaded on", window.location.hostname);
 
   var IS_GROK = window.location.hostname.indexOf("grok.com") !== -1;
+  var IS_CHATGPT = window.location.hostname.indexOf("chatgpt.com") !== -1;
 
   var lastRightClickedElement = null;
   document.addEventListener("mousedown", function (e) {
@@ -294,6 +295,11 @@
       'button[aria-label="Stop response"]', 'button.stop-button',
       'button[aria-label="Stop Responding"]', 'button[aria-label="Stop responding"]',
     ];
+    // ChatGPT since Nov 2026: the stop button is just aria-label="Stop", with no
+    // data-testid. Scoped to ChatGPT because a bare "Stop" is too generic to trust
+    // on other sites. Without it ChatGPT never reported streaming and long answers
+    // were bounced half-written at the first 4-second pause.
+    if (IS_CHATGPT) sels.push('button[aria-label="Stop"]');
     for (var i = 0; i < sels.length; i++) {
       try {
         var el = document.querySelector(sels[i]);
@@ -525,7 +531,10 @@
   // "the message actually went". Mirrors the injection targets.
   var COMPOSER_SELECTORS = {
     claude: ['[contenteditable="true"].ProseMirror', '[contenteditable="true"]'],
-    chatgpt: ["#prompt-textarea", '[contenteditable="true"].ProseMirror', '[contenteditable="true"]'],
+    // The composer is the editor inside the form. Since Nov 2026 some answers are a
+    // "Writing" card that is also a ProseMirror editor, earlier in the DOM, so a bare
+    // '[contenteditable]' lookup finds the card and overwrites ChatGPT's answer.
+    chatgpt: ["#prompt-textarea", 'form [contenteditable="true"]', '[contenteditable="true"].ProseMirror', '[contenteditable="true"]'],
     gemini: ['.ql-editor[contenteditable="true"]', '[contenteditable="true"]'],
     copilot: ['[contenteditable="true"][data-lexical-editor]', "textarea", '[contenteditable="true"]'],
     // Grok (Nov 2026) composes in a tiptap editor. A textarea is still in the DOM but
@@ -670,6 +679,9 @@
 
   function injectChatGPT(text) {
     return waitForEl("#prompt-textarea", 2000).then(function (ed) {
+      // See COMPOSER_SELECTORS.chatgpt: the form's editor, not a Writing card.
+      return ed || waitForEl('form [contenteditable="true"]', 2000);
+    }).then(function (ed) {
       return ed || waitForEl('[contenteditable="true"]', 2000);
     }).then(function (ed) {
       if (!ed) throw new Error("ChatGPT input not found");

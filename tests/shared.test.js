@@ -333,6 +333,46 @@ test("idle → streaming when the count jumps by 2 even if text is unchanged", (
   assert.equal(r.event, "started");
 });
 
+test("the baseline text never completes as a response: back to idle, then the real one", () => {
+  // Live ChatGPT ↔ Claude session, 2026-11-02: after a bounce into ChatGPT, its new
+  // turn started (the count moved) but the reply had no text yet while it thought.
+  // The last reply on the page was still its previous one, stable for 4 seconds,
+  // so that old reply completed, was captured, and the session stopped with
+  // "ChatGPT sent an identical response twice in a row".
+  const OLD = "o".repeat(50);
+  let r = advancePollPhase(idleAt(OLD, 2), { msgCount: 4, text: OLD, streaming: false }, 1000);
+  assert.equal(r.state.phase, "streaming", "a count jump of 2 still starts");
+  r = advancePollPhase(r.state, { msgCount: 4, text: OLD, streaming: false }, 3000);
+  assert.equal(r.state.phase, "cooldown");
+  r = advancePollPhase(r.state, { msgCount: 4, text: OLD, streaming: false }, 5000);
+  assert.notEqual(r.state.phase, "complete", "the text that was already on screen is not a new response");
+  assert.equal(r.state.phase, "idle");
+  assert.equal(r.event, "false-start");
+
+  // The real reply arrives as a new message with new text, and completes normally.
+  r = advancePollPhase(r.state, { msgCount: 5, text: LONG, streaming: false }, 6000);
+  assert.equal(r.state.phase, "streaming");
+  r = advancePollPhase(r.state, { msgCount: 5, text: LONG, streaming: false }, 8000);
+  r = advancePollPhase(r.state, { msgCount: 5, text: LONG, streaming: false }, 10000);
+  assert.equal(r.state.phase, "complete");
+});
+
+test("after a false start, new text completes even if the count does not move again", () => {
+  const OLD = "o".repeat(50);
+  let r = advancePollPhase(idleAt(OLD, 2), { msgCount: 4, text: OLD, streaming: false }, 1000);
+  r = advancePollPhase(r.state, { msgCount: 4, text: OLD, streaming: false }, 3000);
+  r = advancePollPhase(r.state, { msgCount: 4, text: OLD, streaming: false }, 5000);
+  assert.equal(r.event, "false-start");
+  r = advancePollPhase(r.state, { msgCount: 4, text: LONG, streaming: false }, 6000);
+  assert.equal(r.state.phase, "streaming", "the reply filled the slot that was already counted");
+  r = advancePollPhase(r.state, { msgCount: 4, text: LONG, streaming: false }, 8000);
+  r = advancePollPhase(r.state, { msgCount: 4, text: LONG, streaming: false }, 10000);
+  assert.equal(r.state.phase, "complete");
+  // And an ordinary idle tab still ignores changed text with no new message.
+  const plain = advancePollPhase(idleAt("old", 1), { msgCount: 1, text: LONG, streaming: false }, 1000);
+  assert.equal(plain.state.phase, "idle");
+});
+
 test("idle → streaming on the streaming flag alone", () => {
   const r = advancePollPhase(idleAt("same", 1), { msgCount: 1, text: "same", streaming: true }, 1000);
   assert.equal(r.state.phase, "streaming");

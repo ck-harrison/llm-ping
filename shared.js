@@ -211,6 +211,7 @@
       sawStreaming: false,   // has this site ever reported that it was generating?
       msgCount: 0,
       baselineText: "",
+      falseStart: false,     // a turn began but its reply had no text yet: see cooldown
       lastTextLen: 0,
       lastChangeTime: 0,
       streamStartTime: 0,
@@ -256,8 +257,11 @@
 
     if (s.phase === "idle") {
       var textChanged = !!text && text !== s.baselineText;
-      if (curCount > s.msgCount || streaming) {
+      // After a false start the turn has already begun, so new text alone is
+      // enough: the reply may fill a message slot that was counted earlier.
+      if (curCount > s.msgCount || streaming || (s.falseStart && textChanged)) {
         if (textChanged || streaming || curCount > s.msgCount + 1) {
+          s.falseStart = false;
           s.phase = "streaming";
           s.msgCount = curCount;
           s.streamStartTime = now;
@@ -288,6 +292,17 @@
 
     if (s.phase === "cooldown") {
       s.msgCount = curCount;
+      if (!streaming && curLen === s.cooldownTextLen && s.baselineText && text === s.baselineText &&
+          now - s.cooldownStart >= c.COOLDOWN_MS) {
+        // The text that was on screen when this tab was reset is not a response. A
+        // turn can start (the message count moves) while the reply has no text yet,
+        // as ChatGPT does while it thinks, and the previous reply then sits stable
+        // for four seconds. Completing here bounced that old reply, or stopped the
+        // session as "identical response twice in a row". Wait for new text instead.
+        s.phase = "idle";
+        s.falseStart = true;
+        return { state: s, event: "false-start" };
+      }
       if (streaming || curLen !== s.cooldownTextLen) {
         s.phase = "streaming";
         s.lastTextLen = curLen;

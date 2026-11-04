@@ -851,6 +851,8 @@ async function pollTab(tabId, pollCount) {
       console.log(`[LLM Ping] ${targetId}: response STARTED (msgs=${obs.msgCount}, streaming=${obs.streaming})`);
     } else if (advanced.event === "cooldown") {
       console.log(`[LLM Ping] ${targetId}: text stable, entering cooldown (len=${obs.text.length})`);
+    } else if (advanced.event === "false-start") {
+      console.log(`[LLM Ping] ${targetId}: only the previous reply is on screen after 4s, waiting for new text`);
     } else if (advanced.event === "resumed") {
       console.log(`[LLM Ping] ${targetId}: change during cooldown, back to streaming`);
     } else if (advanced.event === "complete" || advanced.event === "complete-short") {
